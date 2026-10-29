@@ -1,296 +1,161 @@
 -- ==========================================
--- 終極整合版：透視 + 飛天 + 黏人瞬移
+-- 第一部分：UI 介面與狀態控制
 -- ==========================================
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-if game.CoreGui:FindFirstChild("UltimateForceGUI") then game.CoreGui.UltimateForceGUI:Destroy() end
+-- 建立全域狀態，供下方渲染邏輯讀取
+_G.ESP_Enabled = false 
 
+-- 建立 UI (開關按鈕)
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "UltimateForceGUI"
-ScreenGui.Parent = game.CoreGui
-ScreenGui.DisplayOrder = 99999
+ScreenGui.Name = "ESP_UI"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
--- 主面板
-local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 220, 0, 220)
-Main.Position = UDim2.new(0.5, -110, 0.5, -110)
-Main.BackgroundColor3 = Color3.fromRGB(10, 15, 25) 
-Main.BorderColor3 = Color3.fromRGB(0, 255, 255) 
-Main.BorderSizePixel = 2
-Main.Active = true
-Main.Draggable = true
-Main.Parent = ScreenGui
-Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Name = "ToggleESP"
+ToggleButton.Size = UDim2.new(0, 150, 0, 50)
+ToggleButton.Position = UDim2.new(0, 20, 0.5, -25)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- 預設紅色(關閉)
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+ToggleButton.Text = "透視: 關閉"
+ToggleButton.TextScaled = true
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Parent = ScreenGui
 
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 25)
-Title.BackgroundColor3 = Color3.fromRGB(0, 40, 60)
-Title.Text = "// t.me/jiaNBB666"
-Title.TextColor3 = Color3.fromRGB(0, 255, 255)
-Title.TextSize = 14
-Title.Font = Enum.Font.Code
-Title.Parent = Main
+local UICorner = Instance.new("UICorner")
+UICorner.CornerRadius = UDim.new(0, 8)
+UICorner.Parent = ToggleButton
 
-local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 20, 0, 20)
-CloseBtn.Position = UDim2.new(1, -25, 0, 5)
-CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-CloseBtn.TextSize = 12
-CloseBtn.Parent = Main
-CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false end)
+-- 按鈕點擊事件
+ToggleButton.MouseButton1Click:Connect(function()
+    _G.ESP_Enabled = not _G.ESP_Enabled -- 切換狀態
+    
+    if _G.ESP_Enabled then
+        ToggleButton.Text = "透視: 開啟"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50) -- 綠色
+    else
+        ToggleButton.Text = "透視: 關閉"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- 紅色
+    end
+end)
+-- ==========================================
+-- 第二部分：透視渲染與血量更新邏輯
+-- ==========================================
+local RunService = game:GetService("RunService")
+local ESP_Objects = {} -- 儲存當前已建立透視的玩家與物件
 
-local ESPBtn = Instance.new("TextButton")
-ESPBtn.Size = UDim2.new(0.9, 0, 0, 40)
-ESPBtn.Position = UDim2.new(0.05, 0, 0, 35)
-ESPBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-ESPBtn.BorderColor3 = Color3.fromRGB(0, 255, 255)
-ESPBtn.Text = "透視: 開啟"
-ESPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-ESPBtn.TextSize = 16
-ESPBtn.Font = Enum.Font.SourceSansBold
-ESPBtn.Parent = Main
+-- 建立單一玩家的透視
+local function createESP(targetPlayer)
+    if targetPlayer == LocalPlayer then return end
+    if ESP_Objects[targetPlayer] then return end
+    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("Head") then return end
 
--- 科技開關
-local function createToggle(posY, text)
-    local frame = Instance.new("Frame")
-    frame.Size = UDim2.new(0.9, 0, 0, 30)
-    frame.Position = UDim2.new(0.05, 0, 0, posY)
-    frame.BackgroundTransparency = 1
-    frame.Parent = Main
+    local character = targetPlayer.Character
 
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(0.7, 0, 1, 0)
-    label.BackgroundTransparency = 1
-    label.Text = text
-    label.TextColor3 = Color3.fromRGB(200, 220, 255)
-    label.TextSize = 13
-    label.Font = Enum.Font.Code
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.Parent = frame
+    -- 穿牆高亮 (Highlight)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "ESP_Highlight"
+    highlight.FillColor = Color3.fromRGB(255, 50, 50)
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- 穿牆關鍵
+    highlight.Adornee = character
+    highlight.Parent = character
 
-    local switchBg = Instance.new("TextButton")
-    switchBg.Size = UDim2.new(0, 50, 0, 24)
-    switchBg.Position = UDim2.new(1, -50, 0, 3)
-    switchBg.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
-    switchBg.BorderColor3 = Color3.fromRGB(0, 255, 255)
-    switchBg.Text = ""
-    switchBg.Parent = frame
-    Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
+    -- 頭頂名條與血量 (BillboardGui)
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ESP_Billboard"
+    billboard.Size = UDim2.new(0, 100, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true -- 穿牆關鍵
+    billboard.Adornee = character.Head
+    billboard.Parent = character.Head
 
-    local switchDot = Instance.new("Frame")
-    switchDot.Size = UDim2.new(0, 20, 0, 20)
-    switchDot.Position = UDim2.new(0, 2, 0, 2)
-    switchDot.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-    switchDot.Parent = switchBg
-    Instance.new("UICorner", switchDot).CornerRadius = UDim.new(1, 0)
+    -- 名字文字
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = targetPlayer.Name
+    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    nameLabel.TextStrokeTransparency = 0
+    nameLabel.TextScaled = true
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.Parent = billboard
 
-    switchBg.MouseButton1Click:Connect(function()
-        local isOn = switchBg.BackgroundColor3 == Color3.fromRGB(0, 50, 80)
-        if isOn then
-            switchBg.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
-            switchDot.Position = UDim2.new(0, 2, 0, 2)
-            switchDot.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
-        else
-            switchBg.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
-            switchDot.Position = UDim2.new(1, -22, 0, 2)
-            switchDot.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-        end
+    -- 血量條背景
+    local healthBg = Instance.new("Frame")
+    healthBg.Size = UDim2.new(1, 0, 0.3, 0)
+    healthBg.Position = UDim2.new(0, 0, 0.6, 0)
+    healthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    healthBg.Parent = billboard
 
-        if text == "飛天 (穿牆)" then 
-            flyEnabled = not flyEnabled 
-            UpBtn.Visible = flyEnabled
-            DownBtn.Visible = flyEnabled
-        elseif text == "黏人瞬移" then 
-            tpEnabled = not tpEnabled 
-        end
-    end)
+    -- 血量條本體
+    local healthBar = Instance.new("Frame")
+    healthBar.Size = UDim2.new(1, 0, 1, 0)
+    healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+    healthBar.Parent = healthBg
+
+    -- 儲存物件
+    ESP_Objects[targetPlayer] = {
+        highlight = highlight,
+        billboard = billboard,
+        healthBar = healthBar
+    }
 end
 
-createToggle(85, "飛天 (穿牆)")
-createToggle(125, "黏人瞬移")
-
--- 右上角獨立飛天升降 UI
-local UpBtn = Instance.new("TextButton")
-UpBtn.Size = UDim2.new(0, 50, 0, 50)
-UpBtn.Position = UDim2.new(1, -130, 0, 100)
-UpBtn.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
-UpBtn.Text = "⬆️"
-UpBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
-UpBtn.TextSize = 24
-UpBtn.Visible = false
-UpBtn.Parent = ScreenGui
-Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1, 0)
-
-local DownBtn = Instance.new("TextButton")
-DownBtn.Size = UDim2.new(0, 50, 0, 50)
-DownBtn.Position = UDim2.new(1, -60, 0, 100)
-DownBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-DownBtn.Text = "⬇️"
-DownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
-DownBtn.TextSize = 24
-DownBtn.Visible = false
-DownBtn.Parent = ScreenGui
-Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1, 0)
-
--- 狀態
-local espEnabled = true
-local flyEnabled = false
-local tpEnabled = false
-local isGoingUp = false
-local isGoingDown = false
-ESPBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    ESPBtn.Text = "透視: " .. (espEnabled and "開啟" or "關閉")
-    ESPBtn.BackgroundColor3 = espEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
-    if not espEnabled then
-        for _, obj in pairs(ScreenGui:GetChildren()) do
-            if obj.Name:match("ESP_") then obj:Destroy() end
-        end
+-- 清理單一玩家的透視
+local function removeESP(targetPlayer)
+    local objects = ESP_Objects[targetPlayer]
+    if objects then
+        if objects.highlight then objects.highlight:Destroy() end
+        if objects.billboard then objects.billboard:Destroy() end
+        ESP_Objects[targetPlayer] = nil
     end
-end)
+end
 
-UserInputService.InputBegan:Connect(function(input)
-    if not flyEnabled then return end
-    if input.UserInputType == Enum.UserInputType.Touch then
-        local p = input.Position
-        if p.X >= UpBtn.AbsolutePosition.X and p.X <= UpBtn.AbsolutePosition.X + UpBtn.AbsoluteSize.X and p.Y >= UpBtn.AbsolutePosition.Y and p.Y <= UpBtn.AbsolutePosition.Y + UpBtn.AbsoluteSize.Y then isGoingUp = true end
-        if p.X >= DownBtn.AbsolutePosition.X and p.X <= DownBtn.AbsolutePosition.X + DownBtn.AbsoluteSize.X and p.Y >= DownBtn.AbsolutePosition.Y and p.Y <= DownBtn.AbsolutePosition.Y + DownBtn.AbsoluteSize.Y then isGoingDown = true end
+-- 清理所有透視
+local function clearAllESP()
+    for player, _ in pairs(ESP_Objects) do
+        removeESP(player)
     end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then isGoingUp = false; isGoingDown = false end
-end)
+end
 
+-- 核心迴圈：監聽狀態並更新畫面
 RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char:FindFirstChild("Humanoid")
-
-    -- 🚀 飛天邏輯 (穿牆、強制位移)
-    if flyEnabled and hrp and humanoid then
-        humanoid.PlatformStand = true
-        -- 強制關閉自身碰撞，實現穿牆
-        for _, p in pairs(char:GetDescendants()) do 
-            if p:IsA("BasePart") then p.CanCollide = false end 
+    -- 若透視關閉，且目前有物件，則全部清除
+    if not _G.ESP_Enabled then
+        if next(ESP_Objects) ~= nil then
+            clearAllESP()
         end
-        
-        local currentY = hrp.Position.Y
-        if isGoingUp then currentY = currentY + 1.5 end
-        if isGoingDown then currentY = currentY - 1.5 end
-        
-        local moveDir = humanoid.MoveDirection * 1.5
-        local newPos = Vector3.new(hrp.Position.X + moveDir.X, currentY, hrp.Position.Z + moveDir.Z)
-        
-        -- 強制修改座標
-        hrp.CFrame = CFrame.new(newPos)
-        hrp.Velocity = Vector3.new(0, 0, 0) 
-    else
-        if humanoid then humanoid.PlatformStand = false end
+        return
     end
 
-    -- 🚀 黏人瞬移邏輯 (找最近的敵人並貼著)
-    if tpEnabled and hrp then
-        local closestRoot = nil
-        local shortestDist = math.huge
-        
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and not player:IsTeammate(LocalPlayer) then
-                local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                local pHum = player.Character:FindFirstChildOfClass("Humanoid")
-                if pRoot and pHum and pHum.Health > 0 then
-                    local d = (hrp.Position - pRoot.Position).Magnitude
-                    if d < shortestDist then
-                        shortestDist = d
-                        closestRoot = pRoot
-                    end
+    -- 若透視開啟，檢查所有玩家
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            -- 如果玩家有角色，且還沒建立透視，就建立
+            if player.Character and player.Character:FindFirstChild("Head") then
+                if not ESP_Objects[player] then
+                    createESP(player)
                 end
-            end
-        end
-        
-        if closestRoot then
-            -- 強制關閉自身碰撞，實現穿牆追蹤
-            for _, p in pairs(char:GetDescendants()) do 
-                if p:IsA("BasePart") then p.CanCollide = false end 
-            end
-            
-            -- 計算目標位置：敵人的身體位置，並往後退 3 格，保持空隙方便開槍
-            local targetPos = closestRoot.Position
-            local direction = (hrp.Position - targetPos).Unit
-            local finalPos = targetPos + (direction * 3) -- 距離敵人 3 格
-            
-            -- 使用 Lerp 平滑追蹤，避免瞬間閃現導致畫面卡頓
-            hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(finalPos), 0.2)
-        end
-    end
-
-    -- 🚀 白色透視邏輯
-    if not espEnabled then return end
-    local active = {}
-
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local pChar = player.Character
-            local pHead = pChar:FindFirstChild("Head")
-            local pHum = pChar:FindFirstChildOfClass("Humanoid")
-            
-            if pHead and pHum and pHum.Health > 0 then
-                active[player.UserId] = true
-                local headPos, onScreen = Camera:WorldToViewportPoint(pHead.Position)
-                local dist = math.floor((Camera.CFrame.Position - pHead.Position).Magnitude)
                 
-                if onScreen then
-                    local box = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId)
-                    if not box then
-                        box = Instance.new("Frame")
-                        box.Name = "ESP_Box_" .. player.UserId
-                        box.BackgroundTransparency = 1
-                        box.BorderSizePixel = 1
-                        box.BorderColor3 = Color3.fromRGB(255, 255, 255)
-                        box.ZIndex = 9999
-                        box.Parent = ScreenGui
+                -- 即時更新血量條
+                local objects = ESP_Objects[player]
+                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+                if objects and humanoid and objects.healthBar then
+                    local healthRatio = humanoid.Health / humanoid.MaxHealth
+                    objects.healthBar.Size = UDim2.new(healthRatio, 0, 1, 0)
+                    
+                    -- 血量低於 30% 時變色
+                    if healthRatio < 0.3 then
+                        objects.healthBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+                    else
+                        objects.healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
                     end
-                    box.Visible = true
-                    box.Size = UDim2.new(0, 40, 0, 50)
-                    box.Position = UDim2.new(0, headPos.X - 20, 0, headPos.Y - 10)
-
-                    local text = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId)
-                    if not text then
-                        text = Instance.new("TextLabel")
-                        text.Name = "ESP_Text_" .. player.UserId
-                        text.BackgroundTransparency = 1
-                        text.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        text.TextStrokeTransparency = 0
-                        text.Font = Enum.Font.SourceSansBold
-                        text.TextSize = 14
-                        text.TextXAlignment = Enum.TextXAlignment.Center
-                        text.ZIndex = 10000
-                        text.Parent = ScreenGui
-                    end
-                    text.Visible = true
-                    text.Size = UDim2.new(0, 150, 0, 50)
-                    text.Position = UDim2.new(0, headPos.X - 75, 0, headPos.Y - 60)
-                    text.Text = player.Name .. "\n距離: " .. dist .. "m\n血量: " .. math.floor(pHum.Health) .. "/" .. math.floor(pHum.MaxHealth)
-                else
-                    local b = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId); if b then b.Visible = false end
-                    local t = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId); if t then t.Visible = false end
                 end
             end
-        end
-    end
-
-    for _, obj in pairs(ScreenGui:GetChildren()) do
-        if obj.Name:match("ESP_") then
-            local idStr = obj.Name:match("%d+")
-            if idStr and not active[tonumber(idStr)] then obj:Destroy() end
         end
     end
 end)
