@@ -1,0 +1,446 @@
+-- ==========================================
+-- 1. 建立未來科技 UI 面板
+-- ==========================================
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+if game.CoreGui:FindFirstChild("CyberGUI") then
+    game.CoreGui.CyberGUI:Destroy()
+end
+
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "CyberGUI"
+ScreenGui.Parent = game.CoreGui
+ScreenGui.DisplayOrder = 999
+ScreenGui.ResetOnSpawn = false
+ScreenGui.IgnoreGuiInset = true
+
+-- 懸浮球
+local FloatBtn = Instance.new("TextButton")
+FloatBtn.Size = UDim2.new(0, 100, 0, 35) 
+FloatBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
+FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 20, 40)
+FloatBtn.Text = "SYSTEM"
+FloatBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
+FloatBtn.TextSize = 14
+FloatBtn.Font = Enum.Font.Code
+FloatBtn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+FloatBtn.BorderSizePixel = 1
+FloatBtn.Visible = false
+FloatBtn.Parent = ScreenGui
+Instance.new("UICorner", FloatBtn).CornerRadius = UDim.new(0, 4)
+
+-- 主面板
+local Main = Instance.new("Frame")
+Main.Size = UDim2.new(0, 220, 0, 320)
+Main.Position = UDim2.new(0.5, -110, 0.5, -160)
+Main.BackgroundColor3 = Color3.fromRGB(5, 10, 20) 
+Main.BorderColor3 = Color3.fromRGB(0, 255, 255) 
+Main.BorderSizePixel = 2
+Main.Active = true
+Main.Draggable = true
+Main.Parent = ScreenGui
+Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
+
+-- 頂部標題列
+local Title = Instance.new("TextLabel")
+Title.Size = UDim2.new(1, 0, 0, 30)
+Title.BackgroundColor3 = Color3.fromRGB(0, 40, 60)
+Title.BackgroundTransparency = 0.5
+Title.Text = "// NEURAL LINK v2.0"
+Title.TextColor3 = Color3.fromRGB(0, 255, 255)
+Title.TextSize = 14
+Title.Font = Enum.Font.Code
+Title.Parent = Main
+Instance.new("UICorner", Title).CornerRadius = UDim.new(0, 6)
+
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 20, 0, 20)
+CloseBtn.Position = UDim2.new(1, -25, 0, 5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+CloseBtn.TextSize = 12
+CloseBtn.Font = Enum.Font.Code
+CloseBtn.Parent = Main
+
+CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; FloatBtn.Visible = true end)
+FloatBtn.MouseButton1Click:Connect(function() Main.Visible = true; FloatBtn.Visible = false end)
+
+-- 🎛️ 建立科技感圓形開關
+local function createSwitch(posY, text)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0.9, 0, 0, 35)
+    frame.Position = UDim2.new(0.05, 0, 0, posY)
+    frame.BackgroundTransparency = 1
+    frame.Parent = Main
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.7, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.Text = text
+    label.TextColor3 = Color3.fromRGB(200, 220, 255)
+    label.TextSize = 13
+    label.Font = Enum.Font.Code
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    -- 開關背景
+    local switchBg = Instance.new("TextButton")
+    switchBg.Size = UDim2.new(0, 50, 0, 24)
+    switchBg.Position = UDim2.new(1, -50, 0, 5)
+    switchBg.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+    switchBg.BorderColor3 = Color3.fromRGB(0, 255, 255)
+    switchBg.BorderSizePixel = 1
+    switchBg.Text = ""
+    switchBg.Parent = frame
+    Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
+
+    -- 圓形按鈕
+    local switchDot = Instance.new("Frame")
+    switchDot.Size = UDim2.new(0, 20, 0, 20)
+    switchDot.Position = UDim2.new(0, 2, 0, 2)
+    switchDot.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+    switchDot.BorderColor3 = Color3.fromRGB(0, 255, 255)
+    switchDot.BorderSizePixel = 1
+    switchDot.Parent = switchBg
+    Instance.new("UICorner", switchDot).CornerRadius = UDim.new(1, 0)
+
+    -- 點擊事件
+    switchBg.MouseButton1Click:Connect(function()
+        local isOn = switchBg.BackgroundColor3 == Color3.fromRGB(0, 50, 80)
+        if isOn then
+            switchBg.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+            switchDot.Position = UDim2.new(0, 2, 0, 2)
+            switchDot.BackgroundColor3 = Color3.fromRGB(0, 100, 150)
+        else
+            switchBg.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
+            switchDot.Position = UDim2.new(1, -22, 0, 2)
+            switchDot.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+        end
+        
+        -- 控制邏輯
+        if text == "透視 (ESP)" then
+            espEnabled = not espEnabled
+            if not espEnabled then
+                for _, obj in pairs(ScreenGui:GetChildren()) do
+                    if obj.Name:match("ESP_") then obj:Destroy() end
+                end
+                for _, p in pairs(Players:GetPlayers()) do
+                    if p.Character and p.Character:FindFirstChild("HackHighlight") then p.Character.HackHighlight:Destroy() end
+                end
+            end
+        elseif text == "飛天 (穿牆)" then
+            flyEnabled = not flyEnabled
+            UpBtn.Visible = flyEnabled
+            DownBtn.Visible = flyEnabled
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") and char:FindFirstChild("HumanoidRootPart") then
+                if flyEnabled then
+                    char.Humanoid.PlatformStand = true
+                    char.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
+                    char.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+                    for _, part in pairs(char:GetDescendants()) do if part:IsA("BasePart") then part.CanCollide = false end end
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Name, bv.MaxForce, bv.Velocity = "HackFly", Vector3.new(1e5, 1e5, 1e5), Vector3.new(0, 0, 0)
+                    bv.Parent = char.HumanoidRootPart
+                else
+                    char.Humanoid.PlatformStand = false
+                    if char.HumanoidRootPart:FindFirstChild("HackFly") then char.HumanoidRootPart.HackFly:Destroy() end
+                    for _, part in pairs(char:GetDescendants()) do if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then part.CanCollide = true end end
+                end
+            end
+        elseif text == "瞬移 (穿牆)" then
+            tpEnabled = not tpEnabled
+        end
+    end)
+    return switchBg
+end
+
+-- 建立開關
+local espSwitch = createSwitch(40, "透視 (ESP)")
+local flySwitch = createSwitch(80, "飛天 (穿牆)")
+local tpSwitch = createSwitch(120, "瞬移 (穿牆)")
+
+-- 瞬移模式選擇區
+local tpModeLabel = Instance.new("TextLabel")
+tpModeLabel.Size = UDim2.new(0.9, 0, 0, 20)
+tpModeLabel.Position = UDim2.new(0.05, 0, 0, 170)
+tpModeLabel.BackgroundTransparency = 1
+tpModeLabel.Text = "> 瞬移座標設定"
+tpModeLabel.TextColor3 = Color3.fromRGB(0, 255, 255)
+tpModeLabel.TextSize = 12
+tpModeLabel.Font = Enum.Font.Code
+tpModeLabel.TextXAlignment = Enum.TextXAlignment.Left
+tpModeLabel.Parent = Main
+
+local function createModeBtn(text, posX, modeValue)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0.28, 0, 0, 30)
+    btn.Position = UDim2.new(posX, 0, 0, 195)
+    btn.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+    btn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+    btn.BorderSizePixel = 1
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(0, 255, 255)
+    btn.TextSize = 11
+    btn.Font = Enum.Font.Code
+    btn.Parent = Main
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    
+    btn.MouseButton1Click:Connect(function()
+        tpMode = modeValue
+        for _, child in pairs(Main:GetChildren()) do
+            if child:IsA("TextButton") and child.Size == UDim2.new(0.28, 0, 0, 30) then
+                child.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+                child.TextColor3 = Color3.fromRGB(0, 255, 255)
+            end
+        end
+        btn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end)
+    return btn
+end
+
+local btnHead2 = createModeBtn("頭頂2m", 0.05, "Head2")
+local btnBody = createModeBtn("身體裡", 0.36, "Body")
+local btnHead5 = createModeBtn("頭頂5m", 0.67, "Head5")
+
+-- 預設選擇「身體裡」
+btnBody.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
+btnBody.TextColor3 = Color3.fromRGB(255, 255, 255)
+
+-- 右上角升降按鈕
+local UpBtn = Instance.new("TextButton")
+UpBtn.Size = UDim2.new(0, 50, 0, 50)
+UpBtn.Position = UDim2.new(1, -130, 0, 100)
+UpBtn.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
+UpBtn.BackgroundTransparency = 0.3
+UpBtn.Text = "⬆️"
+UpBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
+UpBtn.TextSize = 24
+UpBtn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+UpBtn.BorderSizePixel = 1
+UpBtn.Visible = false
+UpBtn.ZIndex = 10
+UpBtn.Parent = ScreenGui
+Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1, 0)
+
+local DownBtn = Instance.new("TextButton")
+DownBtn.Size = UDim2.new(0, 50, 0, 50)
+DownBtn.Position = UDim2.new(1, -60, 0, 100)
+DownBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
+DownBtn.BackgroundTransparency = 0.3
+DownBtn.Text = "⬇️"
+DownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
+DownBtn.TextSize = 24
+DownBtn.BorderColor3 = Color3.fromRGB(255, 50, 50)
+DownBtn.BorderSizePixel = 1
+DownBtn.Visible = false
+DownBtn.ZIndex = 10
+DownBtn.Parent = ScreenGui
+Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1, 0)
+
+-- ==========================================
+-- 2. 核心變數
+-- ==========================================
+local espEnabled = false
+local flyEnabled = false
+local tpEnabled = false
+local tpMode = "Body"
+local isGoingUp = false
+local isGoingDown = false
+-- 觸控判定
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if not flyEnabled then return end
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local p = input.Position
+        if p.X >= UpBtn.AbsolutePosition.X and p.X <= UpBtn.AbsolutePosition.X + UpBtn.AbsoluteSize.X and
+           p.Y >= UpBtn.AbsolutePosition.Y and p.Y <= UpBtn.AbsolutePosition.Y + UpBtn.AbsoluteSize.Y then isGoingUp = true end
+        if p.X >= DownBtn.AbsolutePosition.X and p.X <= DownBtn.AbsolutePosition.X + DownBtn.AbsoluteSize.X and
+           p.Y >= DownBtn.AbsolutePosition.Y and p.Y <= DownBtn.AbsolutePosition.Y + DownBtn.AbsoluteSize.Y then isGoingDown = true end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+        isGoingUp = false
+        isGoingDown = false
+    end
+end)
+
+-- ==========================================
+-- 3. 即時運算迴圈
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChild("Humanoid")
+
+    -- 飛天控制
+    if flyEnabled and hrp and humanoid then
+        local bv = hrp:FindFirstChild("HackFly")
+        if bv then
+            local moveDir = humanoid.MoveDirection * 60
+            if isGoingUp then moveDir = moveDir + Vector3.new(0, 50, 0) end
+            if isGoingDown then moveDir = moveDir - Vector3.new(0, 80, 0) end
+            if humanoid.MoveDirection.Magnitude == 0 and not isGoingUp and not isGoingDown then
+                bv.Velocity = Vector3.new(0, 2, 0)
+            else
+                bv.Velocity = moveDir
+            end
+        end
+    end
+
+    -- 🚨 瞬移穿牆邏輯
+    if tpEnabled and hrp then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then part.CanCollide = false end
+        end
+
+        local closestRoot = nil
+        local shortestDist = math.huge
+        local myPos = hrp.Position
+
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and not player:IsTeammate(LocalPlayer) then
+                local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                local pHum = player.Character:FindFirstChildOfClass("Humanoid")
+                if pRoot and pHum and pHum.Health > 0 then
+                    local dist = (myPos - pRoot.Position).Magnitude
+                    if dist < shortestDist then
+                        shortestDist = dist
+                        closestRoot = pRoot
+                    end
+                end
+            end
+        end
+
+        if closestRoot then
+            local targetPos
+            if tpMode == "Body" then
+                targetPos = closestRoot.Position
+            elseif tpMode == "Head2" then
+                targetPos = closestRoot.Position + Vector3.new(0, 2, 0)
+            elseif tpMode == "Head5" then
+                targetPos = closestRoot.Position + Vector3.new(0, 5, 0)
+            end
+            
+            if targetPos and targetPos.Y > -20 then
+                hrp.CFrame = CFrame.new(targetPos)
+            end
+        end
+    end
+
+    -- 透視邏輯
+    if not espEnabled then return end
+
+    local activePlayers = {}
+
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local pChar = player.Character
+            local pHumanoid = pChar:FindFirstChildOfClass("Humanoid")
+            local pHead = pChar:FindFirstChild("Head")
+            local pRoot = pChar:FindFirstChild("HumanoidRootPart")
+            
+            if pHumanoid and pHumanoid.Health > 0 and pHead and pRoot then
+                activePlayers[player.UserId] = true
+                local dist = math.floor((Camera.CFrame.Position - pRoot.Position).Magnitude)
+                local health = math.floor(pHumanoid.Health)
+                local maxHealth = math.floor(pHumanoid.MaxHealth)
+                
+                if not pChar:FindFirstChild("HackHighlight") then
+                    local hl = Instance.new("Highlight")
+                    hl.Name = "HackHighlight"
+                    hl.FillColor = Color3.fromRGB(255, 0, 0)
+                    hl.OutlineColor = Color3.fromRGB(255, 100, 100)
+                    hl.FillTransparency = 0.6
+                    hl.OutlineTransparency = 0
+                    hl.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                    hl.Parent = pChar
+                end
+
+                local headPos, onScreen = Camera:WorldToViewportPoint(pHead.Position + Vector3.new(0, 0.5, 0))
+                
+                if onScreen then
+                    local box = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId)
+                    if not box then
+                        box = Instance.new("Frame")
+                        box.Name = "ESP_Box_" .. player.UserId
+                        box.BackgroundTransparency = 1
+                        box.BorderSizePixel = 1
+                        box.BorderColor3 = Color3.fromRGB(0, 255, 255) 
+                        box.ZIndex = 9999
+                        box.Parent = ScreenGui
+                    end
+                    box.Visible = true
+                    box.Size = UDim2.new(0, 45, 0, 65)
+                    box.Position = UDim2.new(0, headPos.X - 22.5, 0, headPos.Y - 10)
+
+                    local text = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId)
+                    if not text then
+                        text = Instance.new("TextLabel")
+                        text.Name = "ESP_Text_" .. player.UserId
+                        text.BackgroundTransparency = 1
+                        text.TextColor3 = Color3.fromRGB(0, 255, 255)
+                        text.TextStrokeTransparency = 0
+                        text.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+                        text.Font = Enum.Font.Code
+                        text.TextSize = 12
+                        text.Size = UDim2.new(0, 200, 0, 50)
+                        text.ZIndex = 10000
+                        text.Parent = ScreenGui
+                    end
+                    text.Visible = true
+                    text.Text = "[TARGET]\n" .. player.Name .. "\n距離: " .. dist .. "m\nHP: " .. health
+                    text.Position = UDim2.new(0, headPos.X - 100, 0, headPos.Y - 60)
+
+                    local bar = ScreenGui:FindFirstChild("ESP_Bar_" .. player.UserId)
+                    if not bar then
+                        bar = Instance.new("Frame")
+                        bar.Name = "ESP_Bar_" .. player.UserId
+                        bar.BorderSizePixel = 1
+                        bar.BorderColor3 = Color3.fromRGB(0, 255, 255)
+                        bar.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+                        bar.ZIndex = 9999
+                        bar.Parent = ScreenGui
+                        local fill = Instance.new("Frame")
+                        fill.Name = "Fill"
+                        fill.Size = UDim2.new(1, 0, 1, 0)
+                        fill.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+                        fill.ZIndex = 10000
+                        fill.Parent = bar
+                    end
+                    bar.Visible = true
+                    bar.Size = UDim2.new(0, 45, 0, 5)
+                    bar.Position = UDim2.new(0, headPos.X - 22.5, 0, headPos.Y - 15)
+                    bar.Fill.Size = UDim2.new(health / maxHealth, 0, 1, 0)
+                    
+                    if health / maxHealth > 0.5 then bar.Fill.BackgroundColor3 = Color3.fromRGB(0, 255, 0) 
+                    elseif health / maxHealth > 0.2 then bar.Fill.BackgroundColor3 = Color3.fromRGB(255, 255, 0) 
+                    else bar.Fill.BackgroundColor3 = Color3.fromRGB(255, 0, 0) end
+
+                else
+                    local b = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId); if b then b.Visible = false end
+                    local t = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId); if t then t.Visible = false end
+                    local br = ScreenGui:FindFirstChild("ESP_Bar_" .. player.UserId); if br then br.Visible = false end
+                end
+            end
+        end
+    end
+
+    for _, obj in pairs(ScreenGui:GetChildren()) do
+        if obj.Name:match("ESP_") then
+            local idStr = obj.Name:match("%d+")
+            if idStr then
+                local id = tonumber(idStr)
+                if not activePlayers[id] then obj:Destroy() end
+            end
+        end
+    end
+end)
