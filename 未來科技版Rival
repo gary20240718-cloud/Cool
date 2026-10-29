@@ -1,5 +1,5 @@
 -- ==========================================
--- 大廳強制破解版 (透視 + 飛天 + 瞬移)
+-- 終極暴力破解版：透視 + 飛天 + 瞬移
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,12 +7,11 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-if game.CoreGui:FindFirstChild("CyberGUI") then game.CoreGui.CyberGUI:Destroy() end
+if game.CoreGui:FindFirstChild("UltimateForceGUI") then game.CoreGui.UltimateForceGUI:Destroy() end
 if game.CoreGui:FindFirstChild("jiaNBB_Watermark") then game.CoreGui.jiaNBB_Watermark:Destroy() end
 
--- 建立 UI 畫布
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "CyberGUI"
+ScreenGui.Name = "UltimateForceGUI"
 ScreenGui.Parent = game.CoreGui
 ScreenGui.DisplayOrder = 99999
 ScreenGui.ResetOnSpawn = false
@@ -32,9 +31,9 @@ Watermark.Parent = ScreenGui
 
 -- 主面板
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 220, 0, 320)
-Main.Position = UDim2.new(0.5, -110, 0.5, -160)
-Main.BackgroundColor3 = Color3.fromRGB(5, 10, 20) 
+Main.Size = UDim2.new(0, 220, 0, 260)
+Main.Position = UDim2.new(0.5, -110, 0.5, -130)
+Main.BackgroundColor3 = Color3.fromRGB(10, 15, 25) 
 Main.BorderColor3 = Color3.fromRGB(0, 255, 255) 
 Main.BorderSizePixel = 2
 Main.Active = true
@@ -43,10 +42,9 @@ Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
+Title.Size = UDim2.new(1, 0, 0, 25)
 Title.BackgroundColor3 = Color3.fromRGB(0, 40, 60)
-Title.BackgroundTransparency = 0.5
-Title.Text = "// t.me/jiaNBB666"
+Title.Text = "// 強制透視面板"
 Title.TextColor3 = Color3.fromRGB(0, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.Code
@@ -60,12 +58,24 @@ CloseBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
 CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 CloseBtn.TextSize = 12
-CloseBtn.Font = Enum.Font.Code
 CloseBtn.Parent = Main
 CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false end)
 
+-- 大綠色按鈕 (控制透視)
+local ESPBtn = Instance.new("TextButton")
+ESPBtn.Size = UDim2.new(0.9, 0, 0, 45)
+ESPBtn.Position = UDim2.new(0.05, 0, 0, 40)
+ESPBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+ESPBtn.BorderColor3 = Color3.fromRGB(0, 255, 255)
+ESPBtn.BorderSizePixel = 1
+ESPBtn.Text = "透視: 關閉"
+ESPBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ESPBtn.TextSize = 16
+ESPBtn.Font = Enum.Font.SourceSansBold
+ESPBtn.Parent = Main
+
 -- 開關輔助函數
-local function createSwitch(posY, text)
+local function createToggle(posY, text)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0.9, 0, 0, 35)
     frame.Position = UDim2.new(0.05, 0, 0, posY)
@@ -112,15 +122,8 @@ local function createSwitch(posY, text)
             switchDot.Position = UDim2.new(1, -22, 0, 2)
             switchDot.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
         end
-        
-        if text == "透視 (ESP)" then
-            espEnabled = not espEnabled
-            if not espEnabled then
-                for _, obj in pairs(ScreenGui:GetChildren()) do
-                    if obj.Name:match("ESP_") then obj:Destroy() end
-                end
-            end
-        elseif text == "飛天 (穿牆)" then
+
+        if text == "飛天 (穿牆)" then
             flyEnabled = not flyEnabled
         elseif text == "瞬移 (穿牆)" then
             tpEnabled = not tpEnabled
@@ -129,25 +132,13 @@ local function createSwitch(posY, text)
     return switchBg
 end
 
-local espSwitch = createSwitch(40, "透視 (ESP)")
-local flySwitch = createSwitch(80, "飛天 (穿牆)")
-local tpSwitch = createSwitch(120, "瞬移 (穿牆)")
+local FlySwitch = createToggle(100, "飛天 (穿牆)")
+local TPSwitch = createToggle(140, "瞬移 (穿牆)")
 
--- 瞬移模式設定區
-local btnHead2 = Instance.new("TextButton")
-btnHead2.Size = UDim2.new(0.28, 0, 0, 30)
-btnHead2.Position = UDim2.new(0.05, 0, 0, 195)
-btnHead2.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
-btnHead2.BorderColor3 = Color3.fromRGB(0, 255, 255)
-btnHead2.BorderSizePixel = 1
-btnHead2.Text = "頭頂2m"
-btnHead2.TextColor3 = Color3.fromRGB(0, 255, 255)
-btnHead2.TextSize = 11
-btnHead2.Parent = Main
-
+-- 瞬移模式按鈕
 local btnBody = Instance.new("TextButton")
-btnBody.Size = UDim2.new(0.28, 0, 0, 30)
-btnBody.Position = UDim2.new(0.36, 0, 0, 195)
+btnBody.Size = UDim2.new(0.28, 0, 0, 25)
+btnBody.Position = UDim2.new(0.05, 0, 0, 190)
 btnBody.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
 btnBody.BorderColor3 = Color3.fromRGB(0, 255, 255)
 btnBody.BorderSizePixel = 1
@@ -156,9 +147,20 @@ btnBody.TextColor3 = Color3.fromRGB(255, 255, 255)
 btnBody.TextSize = 11
 btnBody.Parent = Main
 
+local btnHead2 = Instance.new("TextButton")
+btnHead2.Size = UDim2.new(0.28, 0, 0, 25)
+btnHead2.Position = UDim2.new(0.36, 0, 0, 190)
+btnHead2.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
+btnHead2.BorderColor3 = Color3.fromRGB(0, 255, 255)
+btnHead2.BorderSizePixel = 1
+btnHead2.Text = "頭頂2m"
+btnHead2.TextColor3 = Color3.fromRGB(0, 255, 255)
+btnHead2.TextSize = 11
+btnHead2.Parent = Main
+
 local btnHead5 = Instance.new("TextButton")
-btnHead5.Size = UDim2.new(0.28, 0, 0, 30)
-btnHead5.Position = UDim2.new(0.67, 0, 0, 195)
+btnHead5.Size = UDim2.new(0.28, 0, 0, 25)
+btnHead5.Position = UDim2.new(0.67, 0, 0, 190)
 btnHead5.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
 btnHead5.BorderColor3 = Color3.fromRGB(0, 255, 255)
 btnHead5.BorderSizePixel = 1
@@ -167,76 +169,85 @@ btnHead5.TextColor3 = Color3.fromRGB(0, 255, 255)
 btnHead5.TextSize = 11
 btnHead5.Parent = Main
 
-local tpMode = "Body"
+-- 狀態變數
 local espEnabled = false
 local flyEnabled = false
 local tpEnabled = false
+local tpMode = "Body"
 local isGoingUp = false
 local isGoingDown = false
+-- 大綠色按鈕控制透視
+ESPBtn.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    ESPBtn.Text = "透視: " .. (espEnabled and "開啟" or "關閉")
+    ESPBtn.BackgroundColor3 = espEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(50, 50, 50)
+    if not espEnabled then
+        for _, obj in pairs(ScreenGui:GetChildren()) do
+            if obj.Name:match("ESP_") then obj:Destroy() end
+        end
+    end
+end)
 
-local function setModeBtn(btn, mode)
+local function setTPMode(btn, mode)
     tpMode = mode
-    for _, b in pairs({btnHead2, btnBody, btnHead5}) do
+    for _, b in pairs({btnBody, btnHead2, btnHead5}) do
         b.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
         b.TextColor3 = Color3.fromRGB(0, 255, 255)
     end
     btn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 end
+btnBody.MouseButton1Click:Connect(function() setTPMode(btnBody, "Body") end)
+btnHead2.MouseButton1Click:Connect(function() setTPMode(btnHead2, "Head2") end)
+btnHead5.MouseButton1Click:Connect(function() setTPMode(btnHead5, "Head5") end)
 
-btnHead2.MouseButton1Click:Connect(function() setModeBtn(btnHead2, "Head2") end)
-btnBody.MouseButton1Click:Connect(function() setModeBtn(btnBody, "Body") end)
-btnHead5.MouseButton1Click:Connect(function() setModeBtn(btnHead5, "Head5") end)
-
--- 飛天上下按鈕
+-- 飛天/瞬移 上下按鈕
 local UpBtn = Instance.new("TextButton")
 UpBtn.Size = UDim2.new(0, 50, 0, 50)
 UpBtn.Position = UDim2.new(1, -130, 0, 100)
 UpBtn.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
-UpBtn.BackgroundTransparency = 0.3
 UpBtn.Text = "⬆️"
 UpBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 UpBtn.TextSize = 24
 UpBtn.Visible = false
 UpBtn.Parent = ScreenGui
+Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1, 0)
 
 local DownBtn = Instance.new("TextButton")
 DownBtn.Size = UDim2.new(0, 50, 0, 50)
 DownBtn.Position = UDim2.new(1, -60, 0, 100)
 DownBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
-DownBtn.BackgroundTransparency = 0.3
 DownBtn.Text = "⬇️"
 DownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 DownBtn.TextSize = 24
 DownBtn.Visible = false
 DownBtn.Parent = ScreenGui
--- 點擊判定
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
+Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1, 0)
+
+UserInputService.InputBegan:Connect(function(input)
     if not flyEnabled then return end
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch then
         local p = input.Position
-        if p.X >= UpBtn.AbsolutePosition.X and p.X <= UpBtn.AbsolutePosition.X + UpBtn.AbsoluteSize.X and
-           p.Y >= UpBtn.AbsolutePosition.Y and p.Y <= UpBtn.AbsolutePosition.Y + UpBtn.AbsoluteSize.Y then isGoingUp = true end
-        if p.X >= DownBtn.AbsolutePosition.X and p.X <= DownBtn.AbsolutePosition.X + DownBtn.AbsoluteSize.X and
-           p.Y >= DownBtn.AbsolutePosition.Y and p.Y <= DownBtn.AbsolutePosition.Y + DownBtn.AbsoluteSize.Y then isGoingDown = true end
+        if p.X >= UpBtn.AbsolutePosition.X and p.X <= UpBtn.AbsolutePosition.X + UpBtn.AbsoluteSize.X and p.Y >= UpBtn.AbsolutePosition.Y and p.Y <= UpBtn.AbsolutePosition.Y + UpBtn.AbsoluteSize.Y then isGoingUp = true end
+        if p.X >= DownBtn.AbsolutePosition.X and p.X <= DownBtn.AbsolutePosition.X + DownBtn.AbsoluteSize.X and p.Y >= DownBtn.AbsolutePosition.Y and p.Y <= DownBtn.AbsolutePosition.Y + DownBtn.AbsoluteSize.Y then isGoingDown = true end
     end
 end)
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+    if input.UserInputType == Enum.UserInputType.Touch then
         isGoingUp = false
         isGoingDown = false
     end
 end)
 
--- 每幀運算
+-- 主迴圈
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 飛天
-    if flyEnabled and hrp then
+    -- 飛天邏輯
+    if flyEnabled and hrp and humanoid then
         UpBtn.Visible = true
         DownBtn.Visible = true
         humanoid.PlatformStand = true
@@ -256,7 +267,7 @@ RunService.RenderStepped:Connect(function()
         if humanoid then humanoid.PlatformStand = false end
     end
 
-    -- 瞬移
+    -- 瞬移邏輯
     if tpEnabled and hrp then
         for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
         local enemies = {}
@@ -283,7 +294,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 透視 (暴力文字與方框)
+    -- 🚨 強制透視繪製
     if not espEnabled then return end
     local active = {}
 
@@ -300,38 +311,56 @@ RunService.RenderStepped:Connect(function()
                 local dist = math.floor((Camera.CFrame.Position - pRoot.Position).Magnitude)
                 
                 if onScreen then
+                    -- 方框
                     local box = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId)
                     if not box then
                         box = Instance.new("Frame")
                         box.Name = "ESP_Box_" .. player.UserId
                         box.BackgroundTransparency = 1
                         box.BorderSizePixel = 2
-                        box.BorderColor3 = Color3.fromRGB(0, 255, 255)
+                        box.BorderColor3 = Color3.fromRGB(255, 0, 0)
                         box.ZIndex = 99999
                         box.Parent = ScreenGui
                     end
                     box.Visible = true
-                    box.Size = UDim2.new(0, 45, 0, 65)
-                    box.Position = UDim2.new(0, headPos.X - 22.5, 0, headPos.Y - 10)
+                    box.Size = UDim2.new(0, 50, 0, 65)
+                    box.Position = UDim2.new(0, headPos.X - 25, 0, headPos.Y - 10)
 
+                    -- 文字
                     local text = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId)
                     if not text then
                         text = Instance.new("TextLabel")
                         text.Name = "ESP_Text_" .. player.UserId
                         text.BackgroundTransparency = 1
-                        text.TextColor3 = Color3.fromRGB(0, 255, 255)
+                        text.TextColor3 = Color3.fromRGB(0, 255, 0)
                         text.TextStrokeTransparency = 0
-                        text.Font = Enum.Font.Code
+                        text.Font = Enum.Font.SourceSansBold
                         text.TextSize = 14
                         text.ZIndex = 100000
                         text.Parent = ScreenGui
                     end
                     text.Visible = true
-                    text.Text = player.Name .. "\n距離: " .. dist .. "m"
-                    text.Position = UDim2.new(0, headPos.X - 75, 0, headPos.Y - 45)
+                    text.Text = player.Name .. "\n距離: " .. dist .. "m\n血量: " .. math.floor(pHum.Health) .. "/" .. math.floor(pHum.MaxHealth)
+                    text.Position = UDim2.new(0, headPos.X - 75, 0, headPos.Y - 60)
+
+                    -- 血條
+                    local bar = ScreenGui:FindFirstChild("ESP_Bar_" .. player.UserId)
+                    if not bar then
+                        bar = Instance.new("Frame")
+                        bar.Name = "ESP_Bar_" .. player.UserId
+                        bar.BorderSizePixel = 0
+                        bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+                        bar.ZIndex = 99999
+                        bar.Parent = ScreenGui
+                    end
+                    bar.Visible = true
+                    bar.Size = UDim2.new((pHum.Health / pHum.MaxHealth) * 0.5, 0, 0, 5)
+                    bar.Position = UDim2.new(0, headPos.X - 25, 0, headPos.Y - 15)
+                    
                 else
                     local b = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId); if b then b.Visible = false end
                     local t = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId); if t then t.Visible = false end
+                    local br = ScreenGui:FindFirstChild("ESP_Bar_" .. player.UserId); if br then br.Visible = false end
                 end
             end
         end
