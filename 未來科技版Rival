@@ -1,5 +1,5 @@
 -- ==========================================
--- 第一部分：長條懸浮窗 UI 與飛天整合
+-- 終極自訂版：折疊選單 + 垂直血條 + 右上飛天
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -21,152 +21,235 @@ local flySpeed = 60
 local bodyVelocity = nil
 local flyUp = false
 local flyDown = false
+local isMenuOpen = true
 
 -- 強制 UI 顯示
 local GuiParent = pcall(function() return gethui() end) and gethui() or game:GetService("CoreGui")
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ESP_Menu_Draggable"
+ScreenGui.Name = "ESP_Ultimate"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.DisplayOrder = 99999
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = GuiParent
 
 -- ==========================================
--- 1. 建立長條狀懸浮窗 (可拖拽)
+-- 1. 主選單 UI (可折疊)
 -- ==========================================
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 180, 0, 380) -- 長條狀
-MainFrame.Position = UDim2.new(0, 20, 0.2, 0)
+MainFrame.Size = UDim2.new(0, 280, 0, 260)
+MainFrame.Position = UDim2.new(0.5, -140, 0.1, 0) -- 固定在正上方偏下
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 local UICorner = Instance.new("UICorner") UICorner.CornerRadius = UDim.new(0, 8) UICorner.Parent = MainFrame
 
--- 頂部拖拽條
-local DragBar = Instance.new("Frame")
-DragBar.Size = UDim2.new(1, 0, 0, 25)
-DragBar.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
-DragBar.Parent = MainFrame
-local DragCorner = Instance.new("UICorner") DragCorner.CornerRadius = UDim.new(0, 8) DragCorner.Parent = DragBar
+-- 頂部標題列 (點擊可折疊)
+local TitleBar = Instance.new("TextButton")
+TitleBar.Size = UDim2.new(1, 0, 0, 30)
+TitleBar.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+TitleBar.Text = "≡ CYBER ESP ≡  (點擊折疊)"
+TitleBar.TextColor3 = Color3.fromRGB(0, 0, 0)
+TitleBar.Font = Enum.Font.SourceSansBold
+TitleBar.TextSize = 14
+TitleBar.Parent = MainFrame
+local TitleCorner = Instance.new("UICorner") TitleCorner.CornerRadius = UDim.new(0, 8) TitleCorner.Parent = TitleBar
 
-local DragTitle = Instance.new("TextLabel")
-DragTitle.Size = UDim2.new(1, 0, 1, 0)
-DragTitle.BackgroundTransparency = 1
-DragTitle.Text = "≡ 系統選單 ≡"
-DragTitle.TextColor3 = Color3.fromRGB(0, 0, 0)
-DragTitle.Font = Enum.Font.SourceSansBold
-DragTitle.TextSize = 14
-DragTitle.Parent = DragBar
+-- 內容容器 (包含兩個頁面)
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 0, 195)
+ContentFrame.Position = UDim2.new(0, 0, 0, 30)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
 
--- 拖拽邏輯
-local dragging, dragInput, dragStart, startPos
-DragBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-DragBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+-- 折疊邏輯
+TitleBar.MouseButton1Click:Connect(function()
+    isMenuOpen = not isMenuOpen
+    if isMenuOpen then
+        MainFrame.Size = UDim2.new(0, 280, 0, 260)
+        ContentFrame.Visible = true
+        TitleBar.Text = "≡ CYBER ESP ≡  (點擊折疊)"
+    else
+        MainFrame.Size = UDim2.new(0, 280, 0, 30)
+        ContentFrame.Visible = false
+        TitleBar.Text = "≡ CYBER ESP ≡  (點擊展開)"
     end
 end)
 
--- 建立開關按鈕的函數 (精簡版排版)
-local function createToggle(text, posY, configKey, isFlyBtn)
+-- ==========================================
+-- 頁面 1：透視設定 (左右排版)
+-- ==========================================
+local Page1 = Instance.new("Frame")
+Page1.Size = UDim2.new(1, 0, 0, 160)
+Page1.Position = UDim2.new(0, 0, 0, 5)
+Page1.BackgroundTransparency = 1
+Page1.Parent = ContentFrame
+
+local function createToggle(parent, text, posX, posY, configKey)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.9, 0, 0, 28)
-    btn.Position = UDim2.new(0.05, 0, 0, posY)
+    btn.Size = UDim2.new(0.45, 0, 0, 28)
+    btn.Position = UDim2.new(posX, 0, 0, posY)
     btn.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Text = text .. (Config[configKey] and " [ON]" or " [OFF]")
     btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 12
-    btn.Parent = MainFrame
+    btn.TextSize = 11
+    btn.Parent = parent
     
     btn.MouseButton1Click:Connect(function()
         Config[configKey] = not Config[configKey]
         btn.Text = text .. (Config[configKey] and " [ON]" or " [OFF]")
         btn.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
         
-        -- 針對特殊功能的即時處理
         if configKey == "Chams" and not Config[configKey] then
             for _, objs in pairs(Chams_Objects) do if objs.Highlight then objs.Highlight:Destroy() end end
             Chams_Objects = {}
         end
-        
-        if isFlyBtn then
-            local char = LocalPlayer.Character
-            if not char then return end
-            local hum = char:FindFirstChildOfClass("Humanoid")
-            local root = char:FindFirstChild("HumanoidRootPart")
-            if not hum or not root then return end
-            
-            isFlying = Config.FlyEnabled
-            if isFlying then
-                hum.PlatformStand = true
-                bodyVelocity = Instance.new("BodyVelocity")
-                bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bodyVelocity.Parent = root
-            else
-                hum.PlatformStand = false
-                if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
-                flyUp = false; flyDown = false
-                -- 關閉飛天時恢復碰撞
-                for _, part in pairs(char:GetChildren()) do
-                    if part:IsA("BasePart") then part.CanCollide = true end
-                end
-            end
-        end
     end)
 end
 
--- 生成選單按鈕
-createToggle("透視總開關", 35, "Enabled")
-createToggle("透視方框", 68, "Box")
-createToggle("名字顯示", 101, "Name")
-createToggle("距離顯示", 134, "Distance")
-createToggle("血量數字", 167, "HealthText")
-createToggle("血條顯示", 200, "HealthBar")
-createToggle("全身染色", 233, "Chams")
+createToggle(Page1, "透視總開關", 0.03, 5, "Enabled")
+createToggle(Page1, "透視方框", 0.52, 5, "Box")
+createToggle(Page1, "名字顯示", 0.03, 38, "Name")
+createToggle(Page1, "距離顯示", 0.52, 38, "Distance")
+createToggle(Page1, "血量數字", 0.03, 71, "HealthText")
+createToggle(Page1, "血條顯示", 0.52, 71, "HealthBar")
+createToggle(Page1, "全身染色", 0.03, 104, "Chams")
 
--- 分隔線
-local Divider = Instance.new("Frame")
-Divider.Size = UDim2.new(0.9, 0, 0, 2)
-Divider.Position = UDim2.new(0.05, 0, 0, 270)
-Divider.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
-Divider.Parent = MainFrame
+-- ==========================================
+-- 頁面 2：飛天設定 (僅開關)
+-- ==========================================
+local Page2 = Instance.new("Frame")
+Page2.Size = UDim2.new(1, 0, 0, 160)
+Page2.Position = UDim2.new(0, 0, 0, 5)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+Page2.Parent = ContentFrame
 
--- 飛天控制區
-createToggle("飛天模式", 280, "FlyEnabled", true)
-createToggle("飛天穿牆", 313, "FlyNoclip")
+local FlyToggleBtn = Instance.new("TextButton")
+FlyToggleBtn.Size = UDim2.new(0.45, 0, 0, 28)
+FlyToggleBtn.Position = UDim2.new(0.03, 0, 0, 5)
+FlyToggleBtn.BackgroundColor3 = Config.FlyEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+FlyToggleBtn.Text = "飛天模式" .. (Config.FlyEnabled and " [ON]" or " [OFF]")
+FlyToggleBtn.Font = Enum.Font.SourceSansBold
+FlyToggleBtn.TextSize = 11
+FlyToggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+FlyToggleBtn.Parent = Page2
 
--- 上升/下降 按鈕 (放在長條底部)
+local NoclipBtn = Instance.new("TextButton")
+NoclipBtn.Size = UDim2.new(0.45, 0, 0, 28)
+NoclipBtn.Position = UDim2.new(0.52, 0, 0, 5)
+NoclipBtn.BackgroundColor3 = Config.FlyNoclip and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+NoclipBtn.Text = "飛天穿牆" .. (Config.FlyNoclip and " [ON]" or " [OFF]")
+NoclipBtn.Font = Enum.Font.SourceSansBold
+NoclipBtn.TextSize = 11
+NoclipBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+NoclipBtn.Parent = Page2
+
+FlyToggleBtn.MouseButton1Click:Connect(function()
+    Config.FlyEnabled = not Config.FlyEnabled
+    FlyToggleBtn.Text = "飛天模式" .. (Config.FlyEnabled and " [ON]" or " [OFF]")
+    FlyToggleBtn.BackgroundColor3 = Config.FlyEnabled and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return end
+    
+    isFlying = Config.FlyEnabled
+    if isFlying then
+        hum.PlatformStand = true
+        bodyVelocity = Instance.new("BodyVelocity")
+        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVelocity.Parent = root
+    else
+        hum.PlatformStand = false
+        if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+        flyUp = false; flyDown = false
+        for _, part in pairs(char:GetChildren()) do
+            if part:IsA("BasePart") then part.CanCollide = true end
+        end
+    end
+end)
+
+NoclipBtn.MouseButton1Click:Connect(function()
+    Config.FlyNoclip = not Config.FlyNoclip
+    NoclipBtn.Text = "飛天穿牆" .. (Config.FlyNoclip and " [ON]" or " [OFF]")
+    NoclipBtn.BackgroundColor3 = Config.FlyNoclip and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
+end)
+
+-- 底部切換頁面按鈕
+local TabFrame = Instance.new("Frame")
+TabFrame.Size = UDim2.new(1, 0, 0, 30)
+TabFrame.Position = UDim2.new(0, 0, 1, -30)
+TabFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+TabFrame.Parent = ContentFrame
+local TabCorner = Instance.new("UICorner") TabCorner.CornerRadius = UDim.new(0, 8) TabCorner.Parent = TabFrame
+
+local Tab1Btn = Instance.new("TextButton")
+Tab1Btn.Size = UDim2.new(0.5, 0, 1, 0)
+Tab1Btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+Tab1Btn.Text = "透視設定"
+Tab1Btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+Tab1Btn.Font = Enum.Font.SourceSansBold
+Tab1Btn.TextSize = 14
+Tab1Btn.Parent = TabFrame
+
+local Tab2Btn = Instance.new("TextButton")
+Tab2Btn.Size = UDim2.new(0.5, 0, 1, 0)
+Tab2Btn.Position = UDim2.new(0.5, 0, 0, 0)
+Tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+Tab2Btn.Text = "飛天設定"
+Tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+Tab2Btn.Font = Enum.Font.SourceSansBold
+Tab2Btn.TextSize = 14
+Tab2Btn.Parent = TabFrame
+
+Tab1Btn.MouseButton1Click:Connect(function()
+    Page1.Visible = true
+    Page2.Visible = false
+    Tab1Btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+    Tab1Btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    Tab2Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Tab2Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
+
+Tab2Btn.MouseButton1Click:Connect(function()
+    Page1.Visible = false
+    Page2.Visible = true
+    Tab2Btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+    Tab2Btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    Tab1Btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    Tab1Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+end)
+
+-- ==========================================
+-- 2. 右上角飛天控制面板 (獨立)
+-- ==========================================
+local FlyControl = Instance.new("Frame")
+FlyControl.Size = UDim2.new(0, 70, 0, 110)
+FlyControl.Position = UDim2.new(1, -80, 0, 80) -- 右上角
+FlyControl.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+FlyControl.Visible = false -- 只有開啟飛天才顯示
+FlyControl.Parent = ScreenGui
+local FlyControlCorner = Instance.new("UICorner") FlyControlCorner.CornerRadius = UDim.new(0, 8) FlyControlCorner.Parent = FlyControl
+
 local UpBtn = Instance.new("TextButton")
-UpBtn.Size = UDim2.new(0.4, 0, 0, 30)
-UpBtn.Position = UDim2.new(0.05, 0, 0, 346)
+UpBtn.Size = UDim2.new(1, 0, 0.45, 0)
 UpBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 UpBtn.Text = "▲ 上升"
 UpBtn.Font = Enum.Font.SourceSansBold
 UpBtn.TextSize = 12
-UpBtn.Parent = MainFrame
+UpBtn.Parent = FlyControl
 
 local DownBtn = Instance.new("TextButton")
-DownBtn.Size = UDim2.new(0.4, 0, 0, 30)
-DownBtn.Position = UDim2.new(0.55, 0, 0, 346)
+DownBtn.Size = UDim2.new(1, 0, 0.45, 0)
+DownBtn.Position = UDim2.new(0, 0, 0.55, 0)
 DownBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 DownBtn.Text = "▼ 下降"
 DownBtn.Font = Enum.Font.SourceSansBold
 DownBtn.TextSize = 12
-DownBtn.Parent = MainFrame
+DownBtn.Parent = FlyControl
 
 UpBtn.MouseButton1Down:Connect(function() flyUp = true end)
 UpBtn.MouseButton1Up:Connect(function() flyUp = false end)
@@ -175,27 +258,41 @@ UpBtn.MouseLeave:Connect(function() flyUp = false end)
 DownBtn.MouseButton1Down:Connect(function() flyDown = true end)
 DownBtn.MouseButton1Up:Connect(function() flyDown = false end)
 DownBtn.MouseLeave:Connect(function() flyDown = false end)
--- ==========================================
--- 第二部分：渲染與穿牆物理邏輯
--- ==========================================
 
+-- 當飛天開啟時，顯示右上角控制面板
+UserInputService.InputBegan:Connect(function()
+    -- 用一個小迴圈來監聽狀態
+end)
+
+-- 覆寫飛天開關，順便控制右上角面板顯示
+FlyToggleBtn.MouseButton1Click:Connect(function()
+    FlyControl.Visible = Config.FlyEnabled
+end)
+
+
+-- ==========================================
+-- 3. 渲染與物理核心
+-- ==========================================
 local function createNativeESP(targetPlayer)
     if targetPlayer == LocalPlayer then return end
     local character = targetPlayer.Character
     if not character or not character:FindFirstChild("Head") then return end
     local head = character.Head
 
+    -- 主 UI
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "Native_ESP_UI"
-    billboard.Size = UDim2.new(0, 120, 0, 60)
+    billboard.Size = UDim2.new(0, 120, 0, 50)
     billboard.StudsOffset = Vector3.new(0, 3, 0)
     billboard.AlwaysOnTop = true
     billboard.Adornee = head
     billboard.Parent = head
 
+    -- 名字與距離
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Name = "Name"
-    nameLabel.Size = UDim2.new(1, 0, 0.3, 0)
+    nameLabel.Size = UDim2.new(1, 0, 0.4, 0)
+    nameLabel.Position = UDim2.new(0, 0, 0, 0)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
     nameLabel.TextStrokeTransparency = 0
@@ -203,10 +300,11 @@ local function createNativeESP(targetPlayer)
     nameLabel.Font = Enum.Font.SourceSansBold
     nameLabel.Parent = billboard
 
+    -- 血量數字
     local healthText = Instance.new("TextLabel")
     healthText.Name = "HealthText"
     healthText.Size = UDim2.new(1, 0, 0.3, 0)
-    healthText.Position = UDim2.new(0, 0, 0.3, 0)
+    healthText.Position = UDim2.new(0, 0, 0.4, 0)
     healthText.BackgroundTransparency = 1
     healthText.TextColor3 = Color3.fromRGB(0, 255, 0)
     healthText.TextStrokeTransparency = 0
@@ -214,20 +312,22 @@ local function createNativeESP(targetPlayer)
     healthText.Font = Enum.Font.SourceSansBold
     healthText.Parent = billboard
 
+    -- 垂直血條背景 (放在左側)
     local healthBg = Instance.new("Frame")
     healthBg.Name = "HealthBg"
-    healthBg.Size = UDim2.new(1, 0, 0.15, 0)
-    healthBg.Position = UDim2.new(0, 0, 0.7, 0)
+    healthBg.Size = UDim2.new(0, 4, 0.6, 0) -- 寬度變細
+    healthBg.Position = UDim2.new(0, -10, 0.2, 0) -- 移到左邊
     healthBg.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     healthBg.Parent = billboard
-    local UICorner4 = Instance.new("UICorner") UICorner4.CornerRadius = UDim.new(0, 4) UICorner4.Parent = healthBg
+    local UICorner4 = Instance.new("UICorner") UICorner4.CornerRadius = UDim.new(0, 2) UICorner4.Parent = healthBg
 
+    -- 垂直血條本體
     local healthBar = Instance.new("Frame")
     healthBar.Name = "HealthBar"
     healthBar.Size = UDim2.new(1, 0, 1, 0)
     healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     healthBar.Parent = healthBg
-    local UICorner5 = Instance.new("UICorner") UICorner5.CornerRadius = UDim.new(0, 4) UICorner5.Parent = healthBar
+    local UICorner5 = Instance.new("UICorner") UICorner5.CornerRadius = UDim.new(0, 2) UICorner5.Parent = healthBar
 
     ESP_Objects[targetPlayer] = {
         billboard = billboard, nameLabel = nameLabel,
@@ -245,12 +345,16 @@ end
 local lastUpdate = 0
 
 RunService.RenderStepped:Connect(function()
-    -- 1. 飛天與穿牆物理更新
+    -- 飛天控制面板顯示狀態同步
+    if FlyControl.Visible ~= Config.FlyEnabled then
+        FlyControl.Visible = Config.FlyEnabled
+    end
+
+    -- 飛天物理更新
     if isFlying and bodyVelocity and LocalPlayer.Character then
         local char = LocalPlayer.Character
         local root = char:FindFirstChild("HumanoidRootPart")
         
-        -- 處理飛天穿牆 (Noclip)
         if Config.FlyNoclip then
             for _, part in pairs(char:GetChildren()) do
                 if part:IsA("BasePart") then part.CanCollide = false end
@@ -265,7 +369,6 @@ RunService.RenderStepped:Connect(function()
                 local moveVector = controls:GetMoveVector()
                 
                 if moveVector.Magnitude > 0 then
-                    -- 完美修正手機搖桿方向
                     moveDir = (Camera.CFrame.LookVector * -moveVector.Z) + (Camera.CFrame.RightVector * moveVector.X)
                 end
             end
@@ -280,7 +383,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 2. 透視渲染
+    -- 透視渲染
     if not Config.Enabled then
         for plr, _ in pairs(ESP_Objects) do removeNativeESP(plr) end
         return
@@ -323,7 +426,7 @@ RunService.RenderStepped:Connect(function()
                     ui.healthBg.Visible = Config.HealthBar
                     if Config.HealthBar then
                         local ratio = humanoid.Health / humanoid.MaxHealth
-                        ui.healthBar.Size = UDim2.new(ratio, 0, 1, 0)
+                        ui.healthBar.Size = UDim2.new(1, 0, ratio, 0) -- 垂直血條，高度隨血量變動
                         ui.healthBar.BackgroundColor3 = (ratio < 0.3) and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
                     end
                 end
