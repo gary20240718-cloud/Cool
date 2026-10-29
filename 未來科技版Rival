@@ -1,5 +1,5 @@
 -- ==========================================
--- 手機專用整合版：透視 + 飛天
+-- 手機優化終極版：不延遲透視 + 完美飛天
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -21,43 +21,37 @@ local bodyVelocity = nil
 local flyUp = false
 local flyDown = false
 
--- 強制 UI 顯示在最上層 (解決被擋住的問題)
+-- 強制 UI 顯示
 local GuiParent = pcall(function() return gethui() end) and gethui() or game:GetService("CoreGui")
-
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Mobile_ESP_Ultimate"
+ScreenGui.Name = "Mobile_ESP_Optimized"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 99999 -- 最高層級
+ScreenGui.DisplayOrder = 99999
 ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = GuiParent
 
 -- ==========================================
--- 1. 主選單按鈕 (ESP)
+-- 1. UI 介面
 -- ==========================================
 local MainBtn = Instance.new("TextButton")
 MainBtn.Size = UDim2.new(0, 50, 0, 50)
-MainBtn.Position = UDim2.new(0, 10, 0.4, 0) -- 左側中間
+MainBtn.Position = UDim2.new(0, 10, 0.3, 0)
 MainBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 MainBtn.Text = "ESP"
 MainBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
 MainBtn.Font = Enum.Font.SourceSansBold
 MainBtn.TextSize = 16
 MainBtn.Parent = ScreenGui
+local UICorner = Instance.new("UICorner") UICorner.CornerRadius = UDim.new(1, 0) UICorner.Parent = MainBtn
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(1, 0)
-UICorner.Parent = MainBtn
-
--- 選單面板
 local MenuFrame = Instance.new("Frame")
 MenuFrame.Size = UDim2.new(0, 160, 0, 280)
-MenuFrame.Position = UDim2.new(0, 70, 0.4, 0)
+MenuFrame.Position = UDim2.new(0, 70, 0.3, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MenuFrame.Visible = false
 MenuFrame.Parent = ScreenGui
 local UICorner2 = Instance.new("UICorner") UICorner2.Parent = MenuFrame
 
--- 建立開關按鈕
 local function createToggle(text, posY, configKey)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.9, 0, 0, 30)
@@ -66,9 +60,8 @@ local function createToggle(text, posY, configKey)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Text = text .. (Config[configKey] and " [ON]" or " [OFF]")
     btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 14
+    btn.TextSize = 13
     btn.Parent = MenuFrame
-    
     btn.MouseButton1Click:Connect(function()
         Config[configKey] = not Config[configKey]
         btn.Text = text .. (Config[configKey] and " [ON]" or " [OFF]")
@@ -87,17 +80,12 @@ createToggle("距離", 115, "Distance")
 createToggle("血量數字", 150, "HealthText")
 createToggle("左側血條", 185, "HealthBar")
 createToggle("全身染色", 220, "Chams")
+MainBtn.MouseButton1Click:Connect(function() MenuFrame.Visible = not MenuFrame.Visible end)
 
-MainBtn.MouseButton1Click:Connect(function()
-    MenuFrame.Visible = not MenuFrame.Visible
-end)
-
--- ==========================================
--- 2. 手機飛天面板 (獨立於右側)
--- ==========================================
+-- 飛天面板 (縮小並移到右側不擋路的地方)
 local FlyPanel = Instance.new("Frame")
-FlyPanel.Size = UDim2.new(0, 80, 0, 160)
-FlyPanel.Position = UDim2.new(1, -90, 0.4, 0) -- 右側中間
+FlyPanel.Size = UDim2.new(0, 70, 0, 150)
+FlyPanel.Position = UDim2.new(1, -80, 0.6, 0)
 FlyPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 FlyPanel.Parent = ScreenGui
 local UICorner3 = Instance.new("UICorner") UICorner3.Parent = FlyPanel
@@ -108,7 +96,7 @@ FlyToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 FlyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 FlyToggle.Text = "飛天:關"
 FlyToggle.Font = Enum.Font.SourceSansBold
-FlyToggle.TextSize = 14
+FlyToggle.TextSize = 13
 FlyToggle.Parent = FlyPanel
 
 local UpBtn = Instance.new("TextButton")
@@ -117,7 +105,7 @@ UpBtn.Position = UDim2.new(0, 0, 0.3, 0)
 UpBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 UpBtn.Text = "▲上升"
 UpBtn.Font = Enum.Font.SourceSansBold
-UpBtn.TextSize = 14
+UpBtn.TextSize = 13
 UpBtn.Parent = FlyPanel
 
 local DownBtn = Instance.new("TextButton")
@@ -126,17 +114,16 @@ DownBtn.Position = UDim2.new(0, 0, 0.65, 0)
 DownBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 DownBtn.Text = "▼下降"
 DownBtn.Font = Enum.Font.SourceSansBold
-DownBtn.TextSize = 14
+DownBtn.TextSize = 13
 DownBtn.Parent = FlyPanel
 
--- 飛天事件綁定
+-- 綁定飛天與上下事件
 FlyToggle.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     local root = char:FindFirstChild("HumanoidRootPart")
     if not hum or not root then return end
-
     isFlying = not isFlying
     if isFlying then
         FlyToggle.Text = "飛天:開"
@@ -150,19 +137,16 @@ FlyToggle.MouseButton1Click:Connect(function()
         FlyToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         hum.PlatformStand = false
         if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
-        flyUp = false
-        flyDown = false
+        flyUp = false; flyDown = false
     end
 end)
-
 UpBtn.MouseButton1Down:Connect(function() flyUp = true end)
 UpBtn.MouseButton1Up:Connect(function() flyUp = false end)
 DownBtn.MouseButton1Down:Connect(function() flyDown = true end)
 DownBtn.MouseButton1Up:Connect(function() flyDown = false end)
 
-
 -- ==========================================
--- 3. 渲染迴圈與飛天邏輯
+-- 2. 核心渲染與優化邏輯
 -- ==========================================
 local function clearESP()
     for plr, data in pairs(ESP_Drawings) do
@@ -175,18 +159,28 @@ local function clearESP()
     ESP_Drawings = {}
 end
 
+-- 用來記錄上一次刷新的時間，解決延遲問題
+local lastUpdate = 0
+
 RunService.RenderStepped:Connect(function()
-    -- 飛天移動
+    -- 【飛天修正】直接讀取玩家的「虛擬搖桿」移動方向，不再讀取會亂飄的 MoveDirection
     if isFlying and bodyVelocity and LocalPlayer.Character then
         local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if root and hum then
+        if root then
             local moveDir = Vector3.new(0, 0, 0)
-            -- 獲取手機搖桿方向
-            local moveVector = hum.MoveDirection
-            if moveVector.Magnitude > 0 then
-                moveDir = (Camera.CFrame.LookVector * moveVector.Z) + (Camera.CFrame.RightVector * moveVector.X)
+            
+            -- 獲取手機搖桿方向 (透過 PlayerModule)
+            local playerModule = LocalPlayer:FindFirstChild("PlayerScripts"):FindFirstChild("PlayerModule")
+            if playerModule then
+                local controls = require(playerModule):GetControls()
+                local moveVector = controls:GetMoveVector()
+                
+                if moveVector.Magnitude > 0 then
+                    -- 根據攝影機方向轉換搖桿輸入
+                    moveDir = (Camera.CFrame.LookVector * moveVector.Z) + (Camera.CFrame.RightVector * moveVector.X)
+                end
             end
+            
             if flyUp then moveDir += Vector3.new(0, 1, 0) end
             if flyDown then moveDir -= Vector3.new(0, 1, 0) end
             
@@ -198,11 +192,16 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 透視繪製
+    -- 透視總開關
     if not Config.Enabled then
         if next(ESP_Drawings) ~= nil then clearESP() end
         return
     end
+
+    -- 【延遲優化】限制每 0.03 秒 (約 30FPS) 才更新一次座標與 UI，大幅減少手機負擔
+    local tick = tick()
+    if tick - lastUpdate < 0.03 then return end
+    lastUpdate = tick
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -213,6 +212,7 @@ RunService.RenderStepped:Connect(function()
             if head and root and humanoid and humanoid.Health > 0 and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
                 
+                -- 【350公尺限制】嚴格執行
                 if dist > MaxDistance then
                     if ESP_Drawings[player] then
                         ESP_Drawings[player].Box.Visible = false
@@ -224,6 +224,7 @@ RunService.RenderStepped:Connect(function()
                     continue
                 end
 
+                -- 全身染色
                 if Config.Chams then
                     if not Chams_Objects[player] then
                         local h = Instance.new("Highlight")
@@ -302,8 +303,10 @@ RunService.RenderStepped:Connect(function()
                     end
                 else
                     if ESP_Drawings[player] then
-                        draw.Box.Visible = false; draw.Name.Visible = false
-                        draw.HealthBar.Visible = false; draw.HealthText.Visible = false
+                        draw.Box.Visible = false
+                        draw.Name.Visible = false
+                        draw.HealthBar.Visible = false
+                        draw.HealthText.Visible = false
                         draw.Distance.Visible = false
                     end
                 end
