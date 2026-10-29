@@ -1,5 +1,5 @@
 -- ==========================================
--- 終極暴力破解版：白字透視 + 絕對飛天/瞬移
+-- 終極整合版：透視 + 飛天 + 黏人瞬移
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -18,8 +18,8 @@ ScreenGui.IgnoreGuiInset = true
 
 -- 主面板
 local Main = Instance.new("Frame")
-Main.Size = UDim2.new(0, 220, 0, 280)
-Main.Position = UDim2.new(0.5, -110, 0.5, -140)
+Main.Size = UDim2.new(0, 220, 0, 220)
+Main.Position = UDim2.new(0.5, -110, 0.5, -110)
 Main.BackgroundColor3 = Color3.fromRGB(10, 15, 25) 
 Main.BorderColor3 = Color3.fromRGB(0, 255, 255) 
 Main.BorderSizePixel = 2
@@ -108,66 +108,35 @@ local function createToggle(posY, text)
             flyEnabled = not flyEnabled 
             UpBtn.Visible = flyEnabled
             DownBtn.Visible = flyEnabled
-        elseif text == "瞬移 (穿牆)" then 
+        elseif text == "黏人瞬移" then 
             tpEnabled = not tpEnabled 
-            if tpEnabled then checkTeleportLimit() end
         end
     end)
 end
 
 createToggle(85, "飛天 (穿牆)")
-createToggle(125, "瞬移 (穿牆)")
+createToggle(125, "黏人瞬移")
 
--- 瞬移按鈕
-local btnBody = Instance.new("TextButton")
-btnBody.Size = UDim2.new(0.28, 0, 0, 25)
-btnBody.Position = UDim2.new(0.05, 0, 0, 170)
-btnBody.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
-btnBody.Text = "身體裡"
-btnBody.TextColor3 = Color3.fromRGB(255, 255, 255)
-btnBody.TextSize = 11
-btnBody.Parent = Main
-
-local btnHead2 = Instance.new("TextButton")
-btnHead2.Size = UDim2.new(0.28, 0, 0, 25)
-btnHead2.Position = UDim2.new(0.36, 0, 0, 170)
-btnHead2.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
-btnHead2.Text = "頭頂2m"
-btnHead2.TextColor3 = Color3.fromRGB(0, 255, 255)
-btnHead2.TextSize = 11
-btnHead2.Parent = Main
-
-local btnHead5 = Instance.new("TextButton")
-btnHead5.Size = UDim2.new(0.28, 0, 0, 25)
-btnHead5.Position = UDim2.new(0.67, 0, 0, 170)
-btnHead5.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
-btnHead5.Text = "頭頂5m"
-btnHead5.TextColor3 = Color3.fromRGB(0, 255, 255)
-btnHead5.TextSize = 11
-btnHead5.Parent = Main
-
--- 右上角獨立飛天升降 UI (移到大廳左上角，避免被擋住)
+-- 右上角獨立飛天升降 UI
 local UpBtn = Instance.new("TextButton")
 UpBtn.Size = UDim2.new(0, 50, 0, 50)
-UpBtn.Position = UDim2.new(0.05, 0, 0.2, 0) 
+UpBtn.Position = UDim2.new(1, -130, 0, 100)
 UpBtn.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
 UpBtn.Text = "⬆️"
 UpBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 UpBtn.TextSize = 24
 UpBtn.Visible = false
-UpBtn.ZIndex = 100
 UpBtn.Parent = ScreenGui
 Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1, 0)
 
 local DownBtn = Instance.new("TextButton")
 DownBtn.Size = UDim2.new(0, 50, 0, 50)
-DownBtn.Position = UDim2.new(0.05, 60, 0.2, 0)
+DownBtn.Position = UDim2.new(1, -60, 0, 100)
 DownBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
 DownBtn.Text = "⬇️"
 DownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 DownBtn.TextSize = 24
 DownBtn.Visible = false
-DownBtn.ZIndex = 100
 DownBtn.Parent = ScreenGui
 Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1, 0)
 
@@ -175,7 +144,6 @@ Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1, 0)
 local espEnabled = true
 local flyEnabled = false
 local tpEnabled = false
-local tpMode = "Body"
 local isGoingUp = false
 local isGoingDown = false
 ESPBtn.MouseButton1Click:Connect(function()
@@ -189,19 +157,6 @@ ESPBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-local function setTPMode(btn, mode)
-    tpMode = mode
-    for _, b in pairs({btnBody, btnHead2, btnHead5}) do
-        b.BackgroundColor3 = Color3.fromRGB(10, 20, 30)
-        b.TextColor3 = Color3.fromRGB(0, 255, 255)
-    end
-    btn.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-end
-btnBody.MouseButton1Click:Connect(function() setTPMode(btnBody, "Body") end)
-btnHead2.MouseButton1Click:Connect(function() setTPMode(btnHead2, "Head2") end)
-btnHead5.MouseButton1Click:Connect(function() setTPMode(btnHead5, "Head5") end)
-
 UserInputService.InputBegan:Connect(function(input)
     if not flyEnabled then return end
     if input.UserInputType == Enum.UserInputType.Touch then
@@ -214,47 +169,19 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then isGoingUp = false; isGoingDown = false end
 end)
 
--- 🚨 瞬移人數限制提示
-local promptUI = Instance.new("TextLabel")
-promptUI.Size = UDim2.new(0, 300, 0, 50)
-promptUI.Position = UDim2.new(0.5, -150, 0.3, 0)
-promptUI.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-promptUI.TextColor3 = Color3.fromRGB(255, 255, 255)
-promptUI.TextSize = 18
-promptUI.Font = Enum.Font.SourceSansBold
-promptUI.Text = "❌ 活人超過 5 個，瞬移失效！"
-promptUI.Visible = false
-promptUI.ZIndex = 10000
-promptUI.Parent = ScreenGui
-
-local function checkTeleportLimit()
-    local count = 0
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character and not p:IsTeammate(LocalPlayer) then
-            if p.Character:FindFirstChildOfClass("Humanoid") and p.Character.Humanoid.Health > 0 then
-                count = count + 1
-            end
-        end
-    end
-    
-    if count > 5 then
-        promptUI.Visible = true
-        task.wait(3)
-        promptUI.Visible = false
-        tpEnabled = false
-    end
-end
-
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 🚨 絕對飛天 (無視重力，強制鎖定高度)
+    -- 🚀 飛天邏輯 (穿牆、強制位移)
     if flyEnabled and hrp and humanoid then
         humanoid.PlatformStand = true
-        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+        -- 強制關閉自身碰撞，實現穿牆
+        for _, p in pairs(char:GetDescendants()) do 
+            if p:IsA("BasePart") then p.CanCollide = false end 
+        end
         
         local currentY = hrp.Position.Y
         if isGoingUp then currentY = currentY + 1.5 end
@@ -263,41 +190,49 @@ RunService.RenderStepped:Connect(function()
         local moveDir = humanoid.MoveDirection * 1.5
         local newPos = Vector3.new(hrp.Position.X + moveDir.X, currentY, hrp.Position.Z + moveDir.Z)
         
+        -- 強制修改座標
         hrp.CFrame = CFrame.new(newPos)
         hrp.Velocity = Vector3.new(0, 0, 0) 
     else
         if humanoid then humanoid.PlatformStand = false end
     end
 
-    -- 瞬移 (人數限制)
+    -- 🚀 黏人瞬移邏輯 (找最近的敵人並貼著)
     if tpEnabled and hrp then
-        local enemies = {}
+        local closestRoot = nil
+        local shortestDist = math.huge
+        
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and not player:IsTeammate(LocalPlayer) then
                 local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                if pRoot and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-                    table.insert(enemies, pRoot)
+                local pHum = player.Character:FindFirstChildOfClass("Humanoid")
+                if pRoot and pHum and pHum.Health > 0 then
+                    local d = (hrp.Position - pRoot.Position).Magnitude
+                    if d < shortestDist then
+                        shortestDist = d
+                        closestRoot = pRoot
+                    end
                 end
             end
         end
         
-        if #enemies > 0 and #enemies <= 5 then
-            for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-            local closest, dist = nil, math.huge
-            for _, root in pairs(enemies) do
-                local d = (hrp.Position - root.Position).Magnitude
-                if d < dist then dist = d; closest = root end
+        if closestRoot then
+            -- 強制關閉自身碰撞，實現穿牆追蹤
+            for _, p in pairs(char:GetDescendants()) do 
+                if p:IsA("BasePart") then p.CanCollide = false end 
             end
-            if closest then
-                local pos = closest.Position
-                if tpMode == "Head2" then pos = pos + Vector3.new(0, 2, 0) end
-                if tpMode == "Head5" then pos = pos + Vector3.new(0, 5, 0) end
-                if pos.Y > -20 then hrp.CFrame = CFrame.new(pos) end
-            end
+            
+            -- 計算目標位置：敵人的身體位置，並往後退 3 格，保持空隙方便開槍
+            local targetPos = closestRoot.Position
+            local direction = (hrp.Position - targetPos).Unit
+            local finalPos = targetPos + (direction * 3) -- 距離敵人 3 格
+            
+            -- 使用 Lerp 平滑追蹤，避免瞬間閃現導致畫面卡頓
+            hrp.CFrame = hrp.CFrame:Lerp(CFrame.new(finalPos), 0.2)
         end
     end
 
-    -- 透視 (白色文字與方框)
+    -- 🚀 白色透視邏輯
     if not espEnabled then return end
     local active = {}
 
@@ -319,7 +254,7 @@ RunService.RenderStepped:Connect(function()
                         box.Name = "ESP_Box_" .. player.UserId
                         box.BackgroundTransparency = 1
                         box.BorderSizePixel = 1
-                        box.BorderColor3 = Color3.fromRGB(255, 255, 255) -- 白色方框
+                        box.BorderColor3 = Color3.fromRGB(255, 255, 255)
                         box.ZIndex = 9999
                         box.Parent = ScreenGui
                     end
@@ -332,7 +267,7 @@ RunService.RenderStepped:Connect(function()
                         text = Instance.new("TextLabel")
                         text.Name = "ESP_Text_" .. player.UserId
                         text.BackgroundTransparency = 1
-                        text.TextColor3 = Color3.fromRGB(255, 255, 255) -- 純白文字
+                        text.TextColor3 = Color3.fromRGB(255, 255, 255)
                         text.TextStrokeTransparency = 0
                         text.Font = Enum.Font.SourceSansBold
                         text.TextSize = 14
