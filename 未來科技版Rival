@@ -1,5 +1,5 @@
 -- ==========================================
--- 1. 建立未來科技 UI 面板
+-- 1. 建立未來科技 UI 與水印
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,9 +7,27 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-if game.CoreGui:FindFirstChild("CyberGUI") then
-    game.CoreGui.CyberGUI:Destroy()
-end
+-- 左上角水印
+if game.CoreGui:FindFirstChild("jiaNBB_Watermark") then game.CoreGui.jiaNBB_Watermark:Destroy() end
+local WatermarkGui = Instance.new("ScreenGui")
+WatermarkGui.Name = "jiaNBB_Watermark"
+WatermarkGui.Parent = game.CoreGui
+
+local Watermark = Instance.new("TextLabel")
+Watermark.Size = UDim2.new(0, 250, 0, 30)
+Watermark.Position = UDim2.new(0, 80, 0, 15)
+Watermark.BackgroundTransparency = 1
+Watermark.Text = "t.me/jiaNBB666"
+Watermark.TextColor3 = Color3.fromRGB(0, 255, 255)
+Watermark.TextTransparency = 0.3
+Watermark.TextStrokeTransparency = 0.5
+Watermark.TextSize = 22
+Watermark.Font = Enum.Font.Code
+Watermark.TextXAlignment = Enum.TextXAlignment.Left
+Watermark.Parent = WatermarkGui
+
+-- 主 UI
+if game.CoreGui:FindFirstChild("CyberGUI") then game.CoreGui.CyberGUI:Destroy() end
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "CyberGUI"
@@ -23,9 +41,9 @@ local FloatBtn = Instance.new("TextButton")
 FloatBtn.Size = UDim2.new(0, 100, 0, 35) 
 FloatBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
 FloatBtn.BackgroundColor3 = Color3.fromRGB(10, 20, 40)
-FloatBtn.Text = "SYSTEM"
+FloatBtn.Text = "t.me/jiaNBB666"
 FloatBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
-FloatBtn.TextSize = 14
+FloatBtn.TextSize = 12
 FloatBtn.Font = Enum.Font.Code
 FloatBtn.BorderColor3 = Color3.fromRGB(0, 255, 255)
 FloatBtn.BorderSizePixel = 1
@@ -45,12 +63,12 @@ Main.Draggable = true
 Main.Parent = ScreenGui
 Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
 
--- 頂部標題列
+-- 標題
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 30)
 Title.BackgroundColor3 = Color3.fromRGB(0, 40, 60)
 Title.BackgroundTransparency = 0.5
-Title.Text = "// NEURAL LINK v2.0"
+Title.Text = "// t.me/jiaNBB666"
 Title.TextColor3 = Color3.fromRGB(0, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.Code
@@ -70,7 +88,7 @@ CloseBtn.Parent = Main
 CloseBtn.MouseButton1Click:Connect(function() Main.Visible = false; FloatBtn.Visible = true end)
 FloatBtn.MouseButton1Click:Connect(function() Main.Visible = true; FloatBtn.Visible = false end)
 
--- 🎛️ 建立科技感圓形開關
+-- 🎛️ 開關函數
 local function createSwitch(posY, text)
     local frame = Instance.new("Frame")
     frame.Size = UDim2.new(0.9, 0, 0, 35)
@@ -88,7 +106,6 @@ local function createSwitch(posY, text)
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Parent = frame
 
-    -- 開關背景
     local switchBg = Instance.new("TextButton")
     switchBg.Size = UDim2.new(0, 50, 0, 24)
     switchBg.Position = UDim2.new(1, -50, 0, 5)
@@ -99,7 +116,6 @@ local function createSwitch(posY, text)
     switchBg.Parent = frame
     Instance.new("UICorner", switchBg).CornerRadius = UDim.new(1, 0)
 
-    -- 圓形按鈕
     local switchDot = Instance.new("Frame")
     switchDot.Size = UDim2.new(0, 20, 0, 20)
     switchDot.Position = UDim2.new(0, 2, 0, 2)
@@ -109,7 +125,6 @@ local function createSwitch(posY, text)
     switchDot.Parent = switchBg
     Instance.new("UICorner", switchDot).CornerRadius = UDim.new(1, 0)
 
-    -- 點擊事件
     switchBg.MouseButton1Click:Connect(function()
         local isOn = switchBg.BackgroundColor3 == Color3.fromRGB(0, 50, 80)
         if isOn then
@@ -121,8 +136,7 @@ local function createSwitch(posY, text)
             switchDot.Position = UDim2.new(1, -22, 0, 2)
             switchDot.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
         end
-        
-        -- 控制邏輯
+
         if text == "透視 (ESP)" then
             espEnabled = not espEnabled
             if not espEnabled then
@@ -160,12 +174,11 @@ local function createSwitch(posY, text)
     return switchBg
 end
 
--- 建立開關
 local espSwitch = createSwitch(40, "透視 (ESP)")
 local flySwitch = createSwitch(80, "飛天 (穿牆)")
 local tpSwitch = createSwitch(120, "瞬移 (穿牆)")
 
--- 瞬移模式選擇區
+-- 瞬移模式選擇
 local tpModeLabel = Instance.new("TextLabel")
 tpModeLabel.Size = UDim2.new(0.9, 0, 0, 20)
 tpModeLabel.Position = UDim2.new(0.05, 0, 0, 170)
@@ -208,8 +221,6 @@ end
 local btnHead2 = createModeBtn("頭頂2m", 0.05, "Head2")
 local btnBody = createModeBtn("身體裡", 0.36, "Body")
 local btnHead5 = createModeBtn("頭頂5m", 0.67, "Head5")
-
--- 預設選擇「身體裡」
 btnBody.BackgroundColor3 = Color3.fromRGB(0, 80, 120)
 btnBody.TextColor3 = Color3.fromRGB(255, 255, 255)
 
@@ -273,7 +284,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- ==========================================
--- 3. 即時運算迴圈
+-- 3. 即時運算迴圈 (大廳強制破解)
 -- ==========================================
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
@@ -281,62 +292,65 @@ RunService.RenderStepped:Connect(function()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 飛天控制
+    -- 飛天控制 (強制 CFrame 突破大廳限制)
     if flyEnabled and hrp and humanoid then
-        local bv = hrp:FindFirstChild("HackFly")
-        if bv then
-            local moveDir = humanoid.MoveDirection * 60
-            if isGoingUp then moveDir = moveDir + Vector3.new(0, 50, 0) end
-            if isGoingDown then moveDir = moveDir - Vector3.new(0, 80, 0) end
-            if humanoid.MoveDirection.Magnitude == 0 and not isGoingUp and not isGoingDown then
-                bv.Velocity = Vector3.new(0, 2, 0)
-            else
-                bv.Velocity = moveDir
-            end
+        local moveDir = humanoid.MoveDirection * 2
+        if isGoingUp then moveDir = moveDir + Vector3.new(0, 2, 0) end
+        if isGoingDown then moveDir = moveDir - Vector3.new(0, 3, 0) end
+        
+        if humanoid.MoveDirection.Magnitude == 0 and not isGoingUp and not isGoingDown then
+            -- 懸停
+            hrp.Velocity = Vector3.new(0, 0, 0)
+        else
+            hrp.CFrame = hrp.CFrame + moveDir
         end
     end
 
-    -- 🚨 瞬移穿牆邏輯
+    -- 🚨 瞬移邏輯 (超過 5 人失效)
     if tpEnabled and hrp then
         for _, part in pairs(char:GetDescendants()) do
             if part:IsA("BasePart") then part.CanCollide = false end
         end
 
-        local closestRoot = nil
-        local shortestDist = math.huge
-        local myPos = hrp.Position
-
+        local enemies = {}
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and not player:IsTeammate(LocalPlayer) then
                 local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 local pHum = player.Character:FindFirstChildOfClass("Humanoid")
                 if pRoot and pHum and pHum.Health > 0 then
-                    local dist = (myPos - pRoot.Position).Magnitude
-                    if dist < shortestDist then
-                        shortestDist = dist
-                        closestRoot = pRoot
-                    end
+                    table.insert(enemies, pRoot)
                 end
             end
         end
 
-        if closestRoot then
-            local targetPos
-            if tpMode == "Body" then
-                targetPos = closestRoot.Position
-            elseif tpMode == "Head2" then
-                targetPos = closestRoot.Position + Vector3.new(0, 2, 0)
-            elseif tpMode == "Head5" then
-                targetPos = closestRoot.Position + Vector3.new(0, 5, 0)
+        -- 如果活人小於等於 5 個才執行瞬移
+        if #enemies > 0 and #enemies <= 5 then
+            local closestRoot = nil
+            local shortestDist = math.huge
+            local myPos = hrp.Position
+
+            for _, enemyRoot in pairs(enemies) do
+                local dist = (myPos - enemyRoot.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    closestRoot = enemyRoot
+                end
             end
-            
-            if targetPos and targetPos.Y > -20 then
-                hrp.CFrame = CFrame.new(targetPos)
+
+            if closestRoot then
+                local targetPos
+                if tpMode == "Body" then targetPos = closestRoot.Position
+                elseif tpMode == "Head2" then targetPos = closestRoot.Position + Vector3.new(0, 2, 0)
+                elseif tpMode == "Head5" then targetPos = closestRoot.Position + Vector3.new(0, 5, 0) end
+                
+                if targetPos and targetPos.Y > -20 then
+                    hrp.CFrame = CFrame.new(targetPos)
+                end
             end
         end
     end
 
-    -- 透視邏輯
+    -- 透視邏輯 (大廳也強制顯示)
     if not espEnabled then return end
 
     local activePlayers = {}
@@ -354,6 +368,7 @@ RunService.RenderStepped:Connect(function()
                 local health = math.floor(pHumanoid.Health)
                 local maxHealth = math.floor(pHumanoid.MaxHealth)
                 
+                -- 底層高亮 (強制顯示)
                 if not pChar:FindFirstChild("HackHighlight") then
                     local hl = Instance.new("Highlight")
                     hl.Name = "HackHighlight"
