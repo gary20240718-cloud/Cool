@@ -1,28 +1,23 @@
 -- ==========================================
--- 第一部分：Delta UI 介面與狀態控制
+-- Delta 透視腳本 - 第一部分 (UI與核心)
 -- ==========================================
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- 使用 getgenv() 儲存狀態，確保 Delta 注入後能讀取
-getgenv().ESP_Enabled = false 
-getgenv().ESP_Objects = {}
+local isESPEnabled = false
+local ESP_Objects = {}
 
--- 獲取隱藏 UI 的容器 (避免被遊戲防禦機制擋住)
-local CoreGui = game:GetService("CoreGui")
-local GuiParent = pcall(function() return gethui() end) and gethui() or CoreGui
-
--- 建立 UI (開關按鈕)
+-- 建立 UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ESP_UI_Delta"
+ScreenGui.Name = "Delta_ESP_Menu"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = GuiParent
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Name = "ToggleESP"
 ToggleButton.Size = UDim2.new(0, 150, 0, 50)
-ToggleButton.Position = UDim2.new(0, 20, 0.5, -25)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- 預設紅色(關閉)
+ToggleButton.Position = UDim2.new(0, 20, 0.5, -25) -- 畫面左側中間
+ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.Text = "透視: 關閉"
 ToggleButton.TextScaled = true
@@ -35,51 +30,51 @@ UICorner.Parent = ToggleButton
 
 -- 按鈕點擊事件
 ToggleButton.MouseButton1Click:Connect(function()
-    getgenv().ESP_Enabled = not getgenv().ESP_Enabled -- 切換狀態
-    
-    if getgenv().ESP_Enabled then
+    isESPEnabled = not isESPEnabled
+    if isESPEnabled then
         ToggleButton.Text = "透視: 開啟"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50) -- 綠色
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50)
     else
         ToggleButton.Text = "透視: 關閉"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50) -- 紅色
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 end)
 -- ==========================================
--- 第二部分：Delta 透視渲染與血量更新邏輯
+-- Delta 透視腳本 - 第二部分 (渲染與更新)
 -- ==========================================
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 
--- 建立單一玩家的透視
+-- 建立透視的函數
 local function createESP(targetPlayer)
     if targetPlayer == LocalPlayer then return end
-    if getgenv().ESP_Objects[targetPlayer] then return end
-    if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("Head") then return end
-
+    if ESP_Objects[targetPlayer] then return end
+    
+    -- 安全判定：確保角色和頭部存在
     local character = targetPlayer.Character
+    if not character then return end
+    local head = character:FindFirstChild("Head")
+    if not head then return end
 
-    -- 穿牆高亮 (Highlight)
+    -- 1. 建立穿牆高亮 (Highlight)
     local highlight = Instance.new("Highlight")
     highlight.Name = "ESP_Highlight"
-    highlight.FillColor = Color3.fromRGB(255, 50, 50)
+    highlight.FillColor = Color3.fromRGB(255, 50, 50) -- 紅色
     highlight.FillTransparency = 0.5
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- 穿牆關鍵
     highlight.Adornee = character
     highlight.Parent = character
 
-    -- 頭頂名條與血量 (BillboardGui)
+    -- 2. 建立頭頂名條與血量
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "ESP_Billboard"
     billboard.Size = UDim2.new(0, 100, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
     billboard.AlwaysOnTop = true -- 穿牆關鍵
-    billboard.Adornee = character.Head
-    billboard.Parent = character.Head
+    billboard.Adornee = head
+    billboard.Parent = head
 
-    -- 名字文字
+    -- 名字
     local nameLabel = Instance.new("TextLabel")
     nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
     nameLabel.BackgroundTransparency = 1
@@ -90,72 +85,58 @@ local function createESP(targetPlayer)
     nameLabel.Font = Enum.Font.SourceSansBold
     nameLabel.Parent = billboard
 
-    -- 血量條背景
+    -- 血條背景
     local healthBg = Instance.new("Frame")
     healthBg.Size = UDim2.new(1, 0, 0.3, 0)
     healthBg.Position = UDim2.new(0, 0, 0.6, 0)
     healthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     healthBg.Parent = billboard
 
-    -- 血量條本體
+    -- 血條本體
     local healthBar = Instance.new("Frame")
     healthBar.Size = UDim2.new(1, 0, 1, 0)
     healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
     healthBar.Parent = healthBg
 
-    -- 儲存物件至 getgenv()
-    getgenv().ESP_Objects[targetPlayer] = {
+    -- 記錄下來
+    ESP_Objects[targetPlayer] = {
         highlight = highlight,
         billboard = billboard,
         healthBar = healthBar
     }
 end
 
--- 清理單一玩家的透視
-local function removeESP(targetPlayer)
-    local objects = getgenv().ESP_Objects[targetPlayer]
-    if objects then
+-- 清理透視
+local function clearAllESP()
+    for player, objects in pairs(ESP_Objects) do
         if objects.highlight then objects.highlight:Destroy() end
         if objects.billboard then objects.billboard:Destroy() end
-        getgenv().ESP_Objects[targetPlayer] = nil
+        ESP_Objects[player] = nil
     end
 end
 
--- 清理所有透視
-local function clearAllESP()
-    for player, _ in pairs(getgenv().ESP_Objects) do
-        removeESP(player)
-    end
-end
-
--- 核心迴圈：監聽狀態並更新畫面
+-- 核心更新迴圈
 RunService.RenderStepped:Connect(function()
-    -- 若透視關閉，且目前有物件，則全部清除
-    if not getgenv().ESP_Enabled then
-        if next(getgenv().ESP_Objects) ~= nil then
-            clearAllESP()
-        end
+    if not isESPEnabled then
+        if next(ESP_Objects) ~= nil then clearAllESP() end
         return
     end
 
-    -- 若透視開啟，檢查所有玩家
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            -- 如果玩家有角色，且還沒建立透視，就建立
-            if player.Character and player.Character:FindFirstChild("Head") then
-                if not getgenv().ESP_Objects[player] then
+        if player ~= LocalPlayer and player.Character then
+            local head = player.Character:FindFirstChild("Head")
+            if head then
+                if not ESP_Objects[player] then
                     createESP(player)
                 end
                 
-                -- 即時更新血量條
-                local objects = getgenv().ESP_Objects[player]
+                -- 更新血量
                 local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                if objects and humanoid and objects.healthBar then
-                    local healthRatio = humanoid.Health / humanoid.MaxHealth
-                    objects.healthBar.Size = UDim2.new(healthRatio, 0, 1, 0)
-                    
-                    -- 血量低於 30% 時變色
-                    if healthRatio < 0.3 then
+                local objects = ESP_Objects[player]
+                if humanoid and objects and objects.healthBar then
+                    local ratio = humanoid.Health / math.max(humanoid.MaxHealth, 1)
+                    objects.healthBar.Size = UDim2.new(ratio, 0, 1, 0)
+                    if ratio < 0.3 then
                         objects.healthBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
                     else
                         objects.healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
