@@ -1,145 +1,302 @@
 -- ==========================================
--- Delta 透視腳本 - 第一部分 (UI與核心)
+-- 第一部分：懸浮窗 UI 與飛天控制
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 
-local isESPEnabled = false
-local ESP_Objects = {}
+local isESPEnabled = true
+local ESP_Drawings = {}
 
--- 建立 UI
+-- 飛天變數
+local isFlying = false
+local flySpeed = 60
+local bodyVelocity = nil
+local flyUp = false
+local flyDown = false
+
+-- ==========================================
+-- 1. 建立懸浮窗 UI (ESP 開關)
+-- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "Delta_ESP_Menu"
+ScreenGui.Name = "CyberESP_Menu"
 ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 150, 0, 50)
-ToggleButton.Position = UDim2.new(0, 20, 0.5, -25) -- 畫面左側中間
-ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Text = "透視: 關閉"
-ToggleButton.TextScaled = true
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Parent = ScreenGui
+-- 主框架 (懸浮窗)
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 160, 0, 70)
+MainFrame.Position = UDim2.new(0, 20, 0.4, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
 
-local UICorner = Instance.new("UICorner")
-UICorner.CornerRadius = UDim.new(0, 8)
-UICorner.Parent = ToggleButton
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Color = Color3.fromRGB(0, 255, 200)
+UIStroke.Thickness = 1.5
+UIStroke.Parent = MainFrame
 
--- 按鈕點擊事件
-ToggleButton.MouseButton1Click:Connect(function()
+-- 頂部拖拽條
+local DragBar = Instance.new("Frame")
+DragBar.Size = UDim2.new(1, 0, 0, 20)
+DragBar.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+DragBar.BorderSizePixel = 0
+DragBar.Parent = MainFrame
+
+local DragText = Instance.new("TextLabel")
+DragText.Size = UDim2.new(1, 0, 1, 0)
+DragText.BackgroundTransparency = 1
+DragText.Text = "≡ CYBER ESP ≡"
+DragText.TextColor3 = Color3.fromRGB(0, 0, 0)
+DragText.Font = Enum.Font.Code
+DragText.TextSize = 12
+DragText.Parent = DragBar
+
+-- ESP 按鈕
+local Btn = Instance.new("TextButton")
+Btn.Size = UDim2.new(0.8, 0, 0, 35)
+Btn.Position = UDim2.new(0.1, 0, 0.4, 0)
+Btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+Btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+Btn.Text = "[ ESP : ON ]"
+Btn.Font = Enum.Font.Code
+Btn.TextSize = 14
+Btn.Parent = MainFrame
+
+Btn.MouseButton1Click:Connect(function()
     isESPEnabled = not isESPEnabled
     if isESPEnabled then
-        ToggleButton.Text = "透視: 開啟"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(0, 200, 50)
+        Btn.Text = "[ ESP : ON ]"
+        Btn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
     else
-        ToggleButton.Text = "透視: 關閉"
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Btn.Text = "[ ESP : OFF ]"
+        Btn.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    end
+end)
+
+-- 拖拽邏輯
+local dragging, dragInput, dragStart, startPos
+DragBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+DragBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ==========================================
+-- 2. 建立右上角飛天控制面板
+-- ==========================================
+local FlyFrame = Instance.new("Frame")
+FlyFrame.Size = UDim2.new(0, 100, 0, 100)
+FlyFrame.Position = UDim2.new(1, -120, 0, 100) -- 右上角
+FlyFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+FlyFrame.BorderSizePixel = 0
+FlyFrame.Visible = false -- 預設隱藏，飛天時才顯示
+FlyFrame.Parent = ScreenGui
+
+local FlyStroke = Instance.new("UIStroke")
+FlyStroke.Color = Color3.fromRGB(0, 255, 200)
+FlyStroke.Parent = FlyFrame
+
+local UpBtn = Instance.new("TextButton")
+UpBtn.Size = UDim2.new(1, 0, 0.45, 0)
+UpBtn.Position = UDim2.new(0, 0, 0, 0)
+UpBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+UpBtn.Text = "▲ 上升"
+UpBtn.Font = Enum.Font.Code
+UpBtn.Parent = FlyFrame
+
+local DownBtn = Instance.new("TextButton")
+DownBtn.Size = UDim2.new(1, 0, 0.45, 0)
+DownBtn.Position = UDim2.new(0, 0, 0.55, 0)
+DownBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
+DownBtn.Text = "▼ 下降"
+DownBtn.Font = Enum.Font.Code
+DownBtn.Parent = FlyFrame
+
+-- 飛天按鈕事件
+UpBtn.MouseButton1Down:Connect(function() flyUp = true end)
+UpBtn.MouseButton1Up:Connect(function() flyUp = false end)
+UpBtn.MouseLeave:Connect(function() flyUp = false end)
+
+DownBtn.MouseButton1Down:Connect(function() flyDown = true end)
+DownBtn.MouseButton1Up:Connect(function() flyDown = false end)
+DownBtn.MouseLeave:Connect(function() flyDown = false end)
+
+-- 綁定飛天快捷鍵 (F 鍵)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.F then
+        local character = LocalPlayer.Character
+        if not character then return end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if not humanoid or not rootPart then return end
+
+        isFlying = not isFlying
+        FlyFrame.Visible = isFlying
+        
+        if isFlying then
+            humanoid.PlatformStand = true
+            bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+            bodyVelocity.Parent = rootPart
+        else
+            humanoid.PlatformStand = false
+            if bodyVelocity then bodyVelocity:Destroy() bodyVelocity = nil end
+        end
     end
 end)
 -- ==========================================
--- Delta 透視腳本 - 第二部分 (渲染與更新)
+-- 第二部分：渲染邏輯 + 飛天物理
 -- ==========================================
-
--- 建立透視的函數
-local function createESP(targetPlayer)
-    if targetPlayer == LocalPlayer then return end
-    if ESP_Objects[targetPlayer] then return end
-    
-    -- 安全判定：確保角色和頭部存在
-    local character = targetPlayer.Character
-    if not character then return end
-    local head = character:FindFirstChild("Head")
-    if not head then return end
-
-    -- 1. 建立穿牆高亮 (Highlight)
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "ESP_Highlight"
-    highlight.FillColor = Color3.fromRGB(255, 50, 50) -- 紅色
-    highlight.FillTransparency = 0.5
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineTransparency = 0
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop -- 穿牆關鍵
-    highlight.Adornee = character
-    highlight.Parent = character
-
-    -- 2. 建立頭頂名條與血量
-    local billboard = Instance.new("BillboardGui")
-    billboard.Name = "ESP_Billboard"
-    billboard.Size = UDim2.new(0, 100, 0, 50)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
-    billboard.AlwaysOnTop = true -- 穿牆關鍵
-    billboard.Adornee = head
-    billboard.Parent = head
-
-    -- 名字
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(1, 0, 0.5, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = targetPlayer.Name
-    nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    nameLabel.TextStrokeTransparency = 0
-    nameLabel.TextScaled = true
-    nameLabel.Font = Enum.Font.SourceSansBold
-    nameLabel.Parent = billboard
-
-    -- 血條背景
-    local healthBg = Instance.new("Frame")
-    healthBg.Size = UDim2.new(1, 0, 0.3, 0)
-    healthBg.Position = UDim2.new(0, 0, 0.6, 0)
-    healthBg.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-    healthBg.Parent = billboard
-
-    -- 血條本體
-    local healthBar = Instance.new("Frame")
-    healthBar.Size = UDim2.new(1, 0, 1, 0)
-    healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-    healthBar.Parent = healthBg
-
-    -- 記錄下來
-    ESP_Objects[targetPlayer] = {
-        highlight = highlight,
-        billboard = billboard,
-        healthBar = healthBar
-    }
-end
+local Camera = workspace.CurrentCamera
 
 -- 清理透視
-local function clearAllESP()
-    for player, objects in pairs(ESP_Objects) do
-        if objects.highlight then objects.highlight:Destroy() end
-        if objects.billboard then objects.billboard:Destroy() end
-        ESP_Objects[player] = nil
+local function clearESP()
+    for plr, data in pairs(ESP_Drawings) do
+        if data.Box then data.Box:Remove() end
+        if data.Name then data.Name:Remove() end
+        if data.HealthBar then data.HealthBar:Remove() end
+        if data.HealthText then data.HealthText:Remove() end
+        if data.Distance then data.Distance:Remove() end
     end
+    ESP_Drawings = {}
 end
 
--- 核心更新迴圈
+-- 飛天更新迴圈
+RunService.RenderStepped:Connect(function()
+    if isFlying and bodyVelocity and LocalPlayer.Character then
+        local rootPart = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not rootPart then return end
+
+        local moveDirection = Vector3.new(0, 0, 0)
+        
+        -- 獲取 WASD 輸入
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection += Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection -= Camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDirection -= Camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection += Camera.CFrame.RightVector end
+        
+        -- 獲取 UI 上下控制
+        if flyUp then moveDirection += Vector3.new(0, 1, 0) end
+        if flyDown then moveDirection -= Vector3.new(0, 1, 0) end
+
+        if moveDirection.Magnitude > 0 then
+            bodyVelocity.Velocity = moveDirection.Unit * flySpeed
+        else
+            bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+        end
+    end
+end)
+
+-- 透視更新迴圈
 RunService.RenderStepped:Connect(function()
     if not isESPEnabled then
-        if next(ESP_Objects) ~= nil then clearAllESP() end
+        if next(ESP_Drawings) ~= nil then clearESP() end
         return
     end
 
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local head = player.Character:FindFirstChild("Head")
-            if head then
-                if not ESP_Objects[player] then
-                    createESP(player)
-                end
-                
-                -- 更新血量
-                local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
-                local objects = ESP_Objects[player]
-                if humanoid and objects and objects.healthBar then
-                    local ratio = humanoid.Health / math.max(humanoid.MaxHealth, 1)
-                    objects.healthBar.Size = UDim2.new(ratio, 0, 1, 0)
-                    if ratio < 0.3 then
-                        objects.healthBar.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-                    else
-                        objects.healthBar.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+            
+            if head and root and humanoid and humanoid.Health > 0 then
+                local headPos, onScreen = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local rootPos = Camera:WorldToViewportPoint(root.Position - Vector3.new(0, 2.5, 0))
+                local distance = math.floor((LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude) or 0)
+
+                if onScreen then
+                    local height = math.abs(headPos.Y - rootPos.Y)
+                    local width = height / 2
+                    
+                    if not ESP_Drawings[player] then
+                        ESP_Drawings[player] = {
+                            Box = Drawing.new("Square"),
+                            Name = Drawing.new("Text"),
+                            HealthBar = Drawing.new("Line"),
+                            HealthText = Drawing.new("Text"),
+                            Distance = Drawing.new("Text")
+                        }
+                        -- 樣式設定
+                        ESP_Drawings[player].Box.Thickness = 1.5
+                        ESP_Drawings[player].Box.Color = Color3.fromRGB(255, 50, 50)
+                        
+                        ESP_Drawings[player].Name.Size = 15
+                        ESP_Drawings[player].Name.Center = true
+                        ESP_Drawings[player].Name.Outline = true
+                        ESP_Drawings[player].Name.Color = Color3.fromRGB(255, 255, 255)
+                        
+                        ESP_Drawings[player].Distance.Size = 13
+                        ESP_Drawings[player].Distance.Center = true
+                        ESP_Drawings[player].Distance.Outline = true
+                        ESP_Drawings[player].Distance.Color = Color3.fromRGB(0, 255, 200)
+                        
+                        ESP_Drawings[player].HealthText.Size = 13
+                        ESP_Drawings[player].HealthText.Center = true
+                        ESP_Drawings[player].HealthText.Outline = true
+                        ESP_Drawings[player].HealthText.Color = Color3.fromRGB(0, 255, 0)
+                    end
+                    
+                    local draw = ESP_Drawings[player]
+                    
+                    -- 方框
+                    draw.Box.Size = Vector2.new(width, height)
+                    draw.Box.Position = Vector2.new(headPos.X - width/2, headPos.Y)
+                    draw.Box.Visible = true
+                    
+                    -- 名字 (頭上)
+                    draw.Name.Text = player.Name
+                    draw.Name.Position = Vector2.new(headPos.X, headPos.Y - 35)
+                    draw.Name.Visible = true
+
+                    -- 距離 (名字下面)
+                    draw.Distance.Text = "[" .. tostring(distance) .. "m]"
+                    draw.Distance.Position = Vector2.new(headPos.X, headPos.Y - 20)
+                    draw.Distance.Visible = true
+                    
+                    -- 血量文字 (距離下面)
+                    draw.HealthText.Text = math.floor(humanoid.Health) .. " HP"
+                    draw.HealthText.Position = Vector2.new(headPos.X, headPos.Y - 6)
+                    draw.HealthText.Visible = true
+                    
+                    -- 左側垂直血條 (保持原樣)
+                    local healthRatio = humanoid.Health / humanoid.MaxHealth
+                    local barHeight = height * healthRatio
+                    
+                    draw.HealthBar.Thickness = 2.5
+                    draw.HealthBar.Color = Color3.fromRGB(0, 255, 0)
+                    if healthRatio < 0.3 then draw.HealthBar.Color = Color3.fromRGB(255, 0, 0) end
+                    
+                    draw.HealthBar.From = Vector2.new(headPos.X - width/2 - 5, headPos.Y + (height - barHeight))
+                    draw.HealthBar.To = Vector2.new(headPos.X - width/2 - 5, headPos.Y + height)
+                    draw.HealthBar.Visible = true
+
+                else
+                    if ESP_Drawings[player] then
+                        ESP_Drawings[player].Box.Visible = false
+                        ESP_Drawings[player].Name.Visible = false
+                        ESP_Drawings[player].HealthBar.Visible = false
+                        ESP_Drawings[player].HealthText.Visible = false
+                        ESP_Drawings[player].Distance.Visible = false
                     end
                 end
             end
