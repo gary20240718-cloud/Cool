@@ -31,7 +31,7 @@ Instance.new("UICorner", Main).CornerRadius = UDim.new(0, 6)
 local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 25)
 Title.BackgroundColor3 = Color3.fromRGB(0, 40, 60)
-Title.Text = "// 強制透視面板"
+Title.Text = "// t.me/jiaNBB666"
 Title.TextColor3 = Color3.fromRGB(0, 255, 255)
 Title.TextSize = 14
 Title.Font = Enum.Font.Code
@@ -212,22 +212,23 @@ RunService.RenderStepped:Connect(function()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 🚨 暴力飛天 (強制覆寫座標，大廳絕對生效)
+    -- 🚨 絕對暴力飛天 (每幀強制修改座標，無視重力)
     if flyEnabled and hrp and humanoid then
         UpBtn.Visible = true
         DownBtn.Visible = true
         humanoid.PlatformStand = true
         for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
         
-        local moveDir = humanoid.MoveDirection * 1.5 -- 水平移動速度
-        if isGoingUp then moveDir = moveDir + Vector3.new(0, 2, 0) end
-        if isGoingDown then moveDir = moveDir - Vector3.new(0, 2, 0) end
+        -- 基礎垂直位置 (不做任何懸停，避免卡死)
+        local newPos = hrp.CFrame.Position
+        if isGoingUp then newPos = newPos + Vector3.new(0, 1, 0) end
+        if isGoingDown then newPos = newPos - Vector3.new(0, 1, 0) end
         
-        -- 如果有移動，直接修改 CFrame
-        if humanoid.MoveDirection.Magnitude > 0 or isGoingUp or isGoingDown then
-            hrp.CFrame = hrp.CFrame + moveDir
-        end
-        -- 停滯時鎖定速度，防止掉落
+        -- 加入搖桿的水平移動
+        local moveDir = humanoid.MoveDirection
+        newPos = newPos + (moveDir * 1.5)
+        
+        hrp.CFrame = CFrame.new(newPos) -- 強制座標，不依賴物理引擎
         hrp.Velocity = Vector3.new(0, 0, 0)
     else
         UpBtn.Visible = false
@@ -235,34 +236,31 @@ RunService.RenderStepped:Connect(function()
         if humanoid then humanoid.PlatformStand = false end
     end
 
-    -- 瞬移
+    -- 瞬移 (移除人數限制，大廳絕對能用)
     if tpEnabled and hrp then
         for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-        local enemies = {}
+        local closest = nil
+        local dist = math.huge
+        
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and not player:IsTeammate(LocalPlayer) then
                 local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 if pRoot and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-                    table.insert(enemies, pRoot)
+                    local d = (hrp.Position - pRoot.Position).Magnitude
+                    if d < dist then dist = d; closest = pRoot end
                 end
             end
         end
-        if #enemies > 0 and #enemies <= 5 then
-            local closest, dist = nil, math.huge
-            for _, root in pairs(enemies) do
-                local d = (hrp.Position - root.Position).Magnitude
-                if d < dist then dist = d; closest = root end
-            end
-            if closest then
-                local pos = closest.Position
-                if tpMode == "Head2" then pos = pos + Vector3.new(0, 2, 0) end
-                if tpMode == "Head5" then pos = pos + Vector3.new(0, 5, 0) end
-                if pos.Y > -20 then hrp.CFrame = CFrame.new(pos) end
-            end
+        
+        if closest then
+            local pos = closest.Position
+            if tpMode == "Head2" then pos = pos + Vector3.new(0, 2, 0) end
+            if tpMode == "Head5" then pos = pos + Vector3.new(0, 5, 0) end
+            if pos.Y > -20 then hrp.CFrame = CFrame.new(pos) end
         end
     end
 
-    -- 🚨 強制透視繪製 (修復排版與血條)
+    -- 🚨 透視強制繪製 (文字絕對置中、無多餘長條)
     if not espEnabled then return end
     local active = {}
 
@@ -278,7 +276,7 @@ RunService.RenderStepped:Connect(function()
                 local dist = math.floor((Camera.CFrame.Position - pHead.Position).Magnitude)
                 
                 if onScreen then
-                    -- 方框 (精準對準頭部)
+                    -- 方框
                     local box = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId)
                     if not box then
                         box = Instance.new("Frame")
@@ -293,7 +291,7 @@ RunService.RenderStepped:Connect(function()
                     box.Size = UDim2.new(0, 40, 0, 50)
                     box.Position = UDim2.new(0, headPos.X - 20, 0, headPos.Y - 10)
 
-                    -- 文字 (強制置中、顯示在頭頂)
+                    -- 文字 (強制置中、精準對齊頭部中央)
                     local text = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId)
                     if not text then
                         text = Instance.new("TextLabel")
@@ -303,16 +301,16 @@ RunService.RenderStepped:Connect(function()
                         text.TextStrokeTransparency = 0
                         text.Font = Enum.Font.SourceSansBold
                         text.TextSize = 14
-                        text.TextXAlignment = Enum.TextXAlignment.Center -- 強制置中
+                        text.TextXAlignment = Enum.TextXAlignment.Center -- 絕對置中
                         text.ZIndex = 100000
                         text.Parent = ScreenGui
                     end
                     text.Visible = true
+                    -- 將文字座標設為頭部正中央往上偏移 50 像素
+                    text.Size = UDim2.new(0, 150, 0, 50)
+                    text.Position = UDim2.new(0, headPos.X - 75, 0, headPos.Y - 60)
                     text.Text = player.Name .. "\n距離: " .. dist .. "m\n血量: " .. math.floor(pHum.Health) .. "/" .. math.floor(pHum.MaxHealth)
                     
-                    -- 定位在頭部正上方
-                    text.Size = UDim2.new(0, 200, 0, 50)
-                    text.Position = UDim2.new(0, headPos.X - 100, 0, headPos.Y - 65)
                 else
                     local b = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId); if b then b.Visible = false end
                     local t = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId); if t then t.Visible = false end
