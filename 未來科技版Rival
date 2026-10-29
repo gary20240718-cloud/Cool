@@ -1,5 +1,5 @@
 -- ==========================================
--- 第一部分：UI 介面、獨立功能選單、手機飛天控制
+-- 手機專用整合版：透視 + 飛天
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -7,39 +7,40 @@ local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
--- 透視開關狀態
 local Config = {
     Enabled = true, Box = true, Name = true, Distance = true,
     HealthText = true, HealthBar = true, Chams = true
 }
 local ESP_Drawings = {}
 local Chams_Objects = {}
-local MaxDistance = 350 -- 350公尺限制
+local MaxDistance = 350
 
--- 飛天變數
 local isFlying = false
 local flySpeed = 60
 local bodyVelocity = nil
 local flyUp = false
 local flyDown = false
 
--- ==========================================
--- 1. 建立圓形懸浮 UI 與選單
--- ==========================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "ModularCyberESP_Mobile"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+-- 強制 UI 顯示在最上層 (解決被擋住的問題)
+local GuiParent = pcall(function() return gethui() end) and gethui() or game:GetService("CoreGui")
 
--- 圓形主按鈕 (ESP 選單)
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "Mobile_ESP_Ultimate"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 99999 -- 最高層級
+ScreenGui.IgnoreGuiInset = true
+ScreenGui.Parent = GuiParent
+
+-- ==========================================
+-- 1. 主選單按鈕 (ESP)
+-- ==========================================
 local MainBtn = Instance.new("TextButton")
-MainBtn.Size = UDim2.new(0, 60, 0, 60)
-MainBtn.Position = UDim2.new(0, 20, 0.3, 0)
-MainBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+MainBtn.Size = UDim2.new(0, 50, 0, 50)
+MainBtn.Position = UDim2.new(0, 10, 0.4, 0) -- 左側中間
+MainBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
 MainBtn.Text = "ESP"
-MainBtn.TextColor3 = Color3.fromRGB(0, 255, 200)
-MainBtn.Font = Enum.Font.Code
+MainBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+MainBtn.Font = Enum.Font.SourceSansBold
 MainBtn.TextSize = 16
 MainBtn.Parent = ScreenGui
 
@@ -47,111 +48,88 @@ local UICorner = Instance.new("UICorner")
 UICorner.CornerRadius = UDim.new(1, 0)
 UICorner.Parent = MainBtn
 
-local UIStroke = Instance.new("UIStroke")
-UIStroke.Color = Color3.fromRGB(0, 255, 200)
-UIStroke.Thickness = 2
-UIStroke.Parent = MainBtn
-
--- 展開的選單框架
+-- 選單面板
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 180, 0, 300)
-MenuFrame.Position = UDim2.new(0, 90, 0.3, 0)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-MenuFrame.BorderSizePixel = 0
+MenuFrame.Size = UDim2.new(0, 160, 0, 280)
+MenuFrame.Position = UDim2.new(0, 70, 0.4, 0)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MenuFrame.Visible = false
 MenuFrame.Parent = ScreenGui
+local UICorner2 = Instance.new("UICorner") UICorner2.Parent = MenuFrame
 
-local MenuStroke = Instance.new("UIStroke")
-MenuStroke.Color = Color3.fromRGB(0, 255, 200)
-MenuStroke.Parent = MenuFrame
-
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 30)
-Title.BackgroundTransparency = 1
-Title.Text = ">> SYSTEM MENU <<"
-Title.TextColor3 = Color3.fromRGB(0, 255, 200)
-Title.Font = Enum.Font.Code
-Title.TextSize = 14
-Title.Parent = MenuFrame
-
--- 建立開關按鈕的函數
-local function createToggle(name, text, posY, configKey)
+-- 建立開關按鈕
+local function createToggle(text, posY, configKey)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(0.9, 0, 0, 30)
     btn.Position = UDim2.new(0.05, 0, 0, posY)
     btn.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Text = text .. (Config[configKey] and " [ON]" or " [OFF]")
-    btn.Font = Enum.Font.Code
-    btn.TextSize = 12
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 14
     btn.Parent = MenuFrame
     
     btn.MouseButton1Click:Connect(function()
         Config[configKey] = not Config[configKey]
         btn.Text = text .. (Config[configKey] and " [ON]" or " [OFF]")
         btn.BackgroundColor3 = Config[configKey] and Color3.fromRGB(0, 200, 100) or Color3.fromRGB(200, 50, 50)
-        
         if configKey == "Chams" and not Config[configKey] then
-            for plr, objs in pairs(Chams_Objects) do
-                if objs.Highlight then objs.Highlight:Destroy() end
-            end
+            for _, objs in pairs(Chams_Objects) do if objs.Highlight then objs.Highlight:Destroy() end end
             Chams_Objects = {}
         end
     end)
 end
 
-createToggle("Master", "▶ 總開關", 35, "Enabled")
-createToggle("Box", "▶ 顯示方框", 70, "Box")
-createToggle("Name", "▶ 顯示名字", 105, "Name")
-createToggle("Dist", "▶ 顯示距離", 140, "Distance")
-createToggle("HpText", "▶ 顯示血量數字", 175, "HealthText")
-createToggle("HpBar", "▶ 顯示血條", 210, "HealthBar")
-createToggle("Chams", "▶ 全身染色", 245, "Chams")
+createToggle("總開關", 10, "Enabled")
+createToggle("方框", 45, "Box")
+createToggle("名字", 80, "Name")
+createToggle("距離", 115, "Distance")
+createToggle("血量數字", 150, "HealthText")
+createToggle("左側血條", 185, "HealthBar")
+createToggle("全身染色", 220, "Chams")
+
+MainBtn.MouseButton1Click:Connect(function()
+    MenuFrame.Visible = not MenuFrame.Visible
+end)
 
 -- ==========================================
--- 2. 手機專用飛天控制面板 (畫面右側)
+-- 2. 手機飛天面板 (獨立於右側)
 -- ==========================================
 local FlyPanel = Instance.new("Frame")
-FlyPanel.Size = UDim2.new(0, 70, 0, 160)
-FlyPanel.Position = UDim2.new(1, -90, 0.5, -80) -- 右側中間
-FlyPanel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-FlyPanel.BorderSizePixel = 0
+FlyPanel.Size = UDim2.new(0, 80, 0, 160)
+FlyPanel.Position = UDim2.new(1, -90, 0.4, 0) -- 右側中間
+FlyPanel.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 FlyPanel.Parent = ScreenGui
-local FlyStroke = Instance.new("UIStroke")
-FlyStroke.Color = Color3.fromRGB(0, 255, 200)
-FlyStroke.Parent = FlyPanel
+local UICorner3 = Instance.new("UICorner") UICorner3.Parent = FlyPanel
 
--- 飛天開關按鈕
 local FlyToggle = Instance.new("TextButton")
 FlyToggle.Size = UDim2.new(1, 0, 0.3, 0)
 FlyToggle.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 FlyToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
 FlyToggle.Text = "飛天:關"
-FlyToggle.Font = Enum.Font.Code
+FlyToggle.Font = Enum.Font.SourceSansBold
 FlyToggle.TextSize = 14
 FlyToggle.Parent = FlyPanel
 
--- 上升按鈕
 local UpBtn = Instance.new("TextButton")
 UpBtn.Size = UDim2.new(1, 0, 0.35, 0)
 UpBtn.Position = UDim2.new(0, 0, 0.3, 0)
 UpBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
-UpBtn.Text = "▲ 上升"
-UpBtn.Font = Enum.Font.Code
+UpBtn.Text = "▲上升"
+UpBtn.Font = Enum.Font.SourceSansBold
 UpBtn.TextSize = 14
 UpBtn.Parent = FlyPanel
 
--- 下降按鈕
 local DownBtn = Instance.new("TextButton")
 DownBtn.Size = UDim2.new(1, 0, 0.35, 0)
 DownBtn.Position = UDim2.new(0, 0, 0.65, 0)
 DownBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 200)
-DownBtn.Text = "▼ 下降"
-DownBtn.Font = Enum.Font.Code
+DownBtn.Text = "▼下降"
+DownBtn.Font = Enum.Font.SourceSansBold
 DownBtn.TextSize = 14
 DownBtn.Parent = FlyPanel
 
--- 飛天按鈕事件綁定
+-- 飛天事件綁定
 FlyToggle.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
@@ -160,7 +138,6 @@ FlyToggle.MouseButton1Click:Connect(function()
     if not hum or not root then return end
 
     isFlying = not isFlying
-    
     if isFlying then
         FlyToggle.Text = "飛天:開"
         FlyToggle.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
@@ -178,39 +155,15 @@ FlyToggle.MouseButton1Click:Connect(function()
     end
 end)
 
--- 手機長按上升/下降
 UpBtn.MouseButton1Down:Connect(function() flyUp = true end)
 UpBtn.MouseButton1Up:Connect(function() flyUp = false end)
-UpBtn.MouseLeave:Connect(function() flyUp = false end)
-
 DownBtn.MouseButton1Down:Connect(function() flyDown = true end)
 DownBtn.MouseButton1Up:Connect(function() flyDown = false end)
-DownBtn.MouseLeave:Connect(function() flyDown = false end)
 
--- 主按鈕點擊與拖拽
-local dragging, dragStart, startPos
-MainBtn.MouseButton1Click:Connect(function() MenuFrame.Visible = not MenuFrame.Visible end)
-MainBtn.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainBtn.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then dragging = false end
-        end)
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        MainBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        MenuFrame.Position = UDim2.new(MainBtn.Position.X.Scale, MainBtn.Position.X.Offset + 70, MainBtn.Position.Y.Scale, MainBtn.Position.Y.Offset)
-    end
-end)
--- ==========================================
--- 第二部分：渲染核心 (距離限制 + 獨立功能 + 染色)
--- ==========================================
 
+-- ==========================================
+-- 3. 渲染迴圈與飛天邏輯
+-- ==========================================
 local function clearESP()
     for plr, data in pairs(ESP_Drawings) do
         if data.Box then data.Box:Remove() end
@@ -223,22 +176,17 @@ local function clearESP()
 end
 
 RunService.RenderStepped:Connect(function()
-    -- 1. 飛天物理移動邏輯
+    -- 飛天移動
     if isFlying and bodyVelocity and LocalPlayer.Character then
         local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if root and hum then
             local moveDir = Vector3.new(0, 0, 0)
-            -- 手機搖桿移動 (Roblox 的移動向量)
-            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                local moveVector = humanoid.MoveDirection
-                if moveVector.Magnitude > 0 then
-                    -- 沿著攝影機方向飛
-                    moveDir = (Camera.CFrame.LookVector * moveVector.Z) + (Camera.CFrame.RightVector * moveVector.X)
-                end
+            -- 獲取手機搖桿方向
+            local moveVector = hum.MoveDirection
+            if moveVector.Magnitude > 0 then
+                moveDir = (Camera.CFrame.LookVector * moveVector.Z) + (Camera.CFrame.RightVector * moveVector.X)
             end
-            
-            -- 加上上升/下降
             if flyUp then moveDir += Vector3.new(0, 1, 0) end
             if flyDown then moveDir -= Vector3.new(0, 1, 0) end
             
@@ -250,17 +198,12 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 2. 總開關
+    -- 透視繪製
     if not Config.Enabled then
         if next(ESP_Drawings) ~= nil then clearESP() end
-        if next(Chams_Objects) ~= nil then
-            for _, objs in pairs(Chams_Objects) do if objs.Highlight then objs.Highlight:Destroy() end end
-            Chams_Objects = {}
-        end
         return
     end
 
-    -- 3. 透視渲染
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local head = player.Character:FindFirstChild("Head")
@@ -270,7 +213,6 @@ RunService.RenderStepped:Connect(function()
             if head and root and humanoid and humanoid.Health > 0 and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
                 local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
                 
-                -- 350公尺限制
                 if dist > MaxDistance then
                     if ESP_Drawings[player] then
                         ESP_Drawings[player].Box.Visible = false
@@ -282,13 +224,11 @@ RunService.RenderStepped:Connect(function()
                     continue
                 end
 
-                -- 全身染色
                 if Config.Chams then
                     if not Chams_Objects[player] then
                         local h = Instance.new("Highlight")
                         h.FillColor = Color3.fromRGB(255, 50, 50)
                         h.FillTransparency = 0.5
-                        h.OutlineColor = Color3.fromRGB(255, 255, 255)
                         h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                         h.Adornee = player.Character
                         h.Parent = player.Character
@@ -305,26 +245,21 @@ RunService.RenderStepped:Connect(function()
                     
                     if not ESP_Drawings[player] then
                         ESP_Drawings[player] = {
-                            Box = Drawing.new("Square"),
-                            Name = Drawing.new("Text"),
-                            HealthBar = Drawing.new("Line"),
-                            HealthText = Drawing.new("Text"),
+                            Box = Drawing.new("Square"), Name = Drawing.new("Text"),
+                            HealthBar = Drawing.new("Line"), HealthText = Drawing.new("Text"),
                             Distance = Drawing.new("Text")
                         }
                         ESP_Drawings[player].Box.Thickness = 1.5
                         ESP_Drawings[player].Box.Color = Color3.fromRGB(255, 50, 50)
-                        
-                        ESP_Drawings[player].Name.Size = 15
+                        ESP_Drawings[player].Name.Size = 16
                         ESP_Drawings[player].Name.Center = true
                         ESP_Drawings[player].Name.Outline = true
                         ESP_Drawings[player].Name.Color = Color3.fromRGB(255, 255, 255)
-                        
-                        ESP_Drawings[player].Distance.Size = 13
+                        ESP_Drawings[player].Distance.Size = 14
                         ESP_Drawings[player].Distance.Center = true
                         ESP_Drawings[player].Distance.Outline = true
                         ESP_Drawings[player].Distance.Color = Color3.fromRGB(0, 255, 200)
-                        
-                        ESP_Drawings[player].HealthText.Size = 13
+                        ESP_Drawings[player].HealthText.Size = 14
                         ESP_Drawings[player].HealthText.Center = true
                         ESP_Drawings[player].HealthText.Outline = true
                         ESP_Drawings[player].HealthText.Color = Color3.fromRGB(0, 255, 0)
@@ -341,36 +276,34 @@ RunService.RenderStepped:Connect(function()
                     draw.Name.Visible = Config.Name
                     if Config.Name then
                         draw.Name.Text = player.Name
-                        draw.Name.Position = Vector2.new(headPos.X, headPos.Y - 35)
+                        draw.Name.Position = Vector2.new(headPos.X, headPos.Y - 40)
                     end
 
                     draw.Distance.Visible = Config.Distance
                     if Config.Distance then
                         draw.Distance.Text = "[" .. math.floor(dist) .. "m]"
-                        draw.Distance.Position = Vector2.new(headPos.X, headPos.Y - 20)
+                        draw.Distance.Position = Vector2.new(headPos.X, headPos.Y - 24)
                     end
                     
                     draw.HealthText.Visible = Config.HealthText
                     if Config.HealthText then
                         draw.HealthText.Text = math.floor(humanoid.Health) .. " HP"
-                        draw.HealthText.Position = Vector2.new(headPos.X, headPos.Y - 6)
+                        draw.HealthText.Position = Vector2.new(headPos.X, headPos.Y - 8)
                     end
                     
                     draw.HealthBar.Visible = Config.HealthBar
                     if Config.HealthBar then
                         local healthRatio = humanoid.Health / humanoid.MaxHealth
                         local barHeight = height * healthRatio
-                        draw.HealthBar.Thickness = 2.5
+                        draw.HealthBar.Thickness = 3
                         draw.HealthBar.Color = (healthRatio < 0.3) and Color3.fromRGB(255, 0, 0) or Color3.fromRGB(0, 255, 0)
-                        draw.HealthBar.From = Vector2.new(headPos.X - width/2 - 5, headPos.Y + (height - barHeight))
-                        draw.HealthBar.To = Vector2.new(headPos.X - width/2 - 5, headPos.Y + height)
+                        draw.HealthBar.From = Vector2.new(headPos.X - width/2 - 6, headPos.Y + (height - barHeight))
+                        draw.HealthBar.To = Vector2.new(headPos.X - width/2 - 6, headPos.Y + height)
                     end
                 else
                     if ESP_Drawings[player] then
-                        draw.Box.Visible = false
-                        draw.Name.Visible = false
-                        draw.HealthBar.Visible = false
-                        draw.HealthText.Visible = false
+                        draw.Box.Visible = false; draw.Name.Visible = false
+                        draw.HealthBar.Visible = false; draw.HealthText.Visible = false
                         draw.Distance.Visible = false
                     end
                 end
