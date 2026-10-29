@@ -1,5 +1,5 @@
 -- ==========================================
--- 終極暴力破解版：透視 + 飛天 + 瞬移
+-- 終極暴力破解版：白字透視 + 絕對飛天/瞬移
 -- ==========================================
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -146,10 +146,10 @@ btnHead5.TextColor3 = Color3.fromRGB(0, 255, 255)
 btnHead5.TextSize = 11
 btnHead5.Parent = Main
 
--- 右上角獨立飛天升降 UI
+-- 右上角獨立飛天升降 UI (移到大廳左上角，避免被擋住)
 local UpBtn = Instance.new("TextButton")
 UpBtn.Size = UDim2.new(0, 50, 0, 50)
-UpBtn.Position = UDim2.new(1, -130, 0, 100)
+UpBtn.Position = UDim2.new(0.05, 0, 0.2, 0) 
 UpBtn.BackgroundColor3 = Color3.fromRGB(0, 50, 80)
 UpBtn.Text = "⬆️"
 UpBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
@@ -161,7 +161,7 @@ Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1, 0)
 
 local DownBtn = Instance.new("TextButton")
 DownBtn.Size = UDim2.new(0, 50, 0, 50)
-DownBtn.Position = UDim2.new(1, -60, 0, 100)
+DownBtn.Position = UDim2.new(0.05, 60, 0.2, 0)
 DownBtn.BackgroundColor3 = Color3.fromRGB(50, 0, 0)
 DownBtn.Text = "⬇️"
 DownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
@@ -251,21 +251,20 @@ RunService.RenderStepped:Connect(function()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 🚨 絕對暴力飛天 (強制覆寫座標)
+    -- 🚨 絕對飛天 (無視重力，強制鎖定高度)
     if flyEnabled and hrp and humanoid then
         humanoid.PlatformStand = true
         for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
         
-        -- 直接修改座標，無視物理引擎
-        local newPos = hrp.Position
-        if isGoingUp then newPos = newPos + Vector3.new(0, 2, 0) end
-        if isGoingDown then newPos = newPos - Vector3.new(0, 2, 0) end
+        local currentY = hrp.Position.Y
+        if isGoingUp then currentY = currentY + 1.5 end
+        if isGoingDown then currentY = currentY - 1.5 end
         
-        local moveDir = humanoid.MoveDirection
-        newPos = newPos + (moveDir * 2)
+        local moveDir = humanoid.MoveDirection * 1.5
+        local newPos = Vector3.new(hrp.Position.X + moveDir.X, currentY, hrp.Position.Z + moveDir.Z)
         
         hrp.CFrame = CFrame.new(newPos)
-        hrp.Velocity = Vector3.new(0, 0, 0)
+        hrp.Velocity = Vector3.new(0, 0, 0) 
     else
         if humanoid then humanoid.PlatformStand = false end
     end
@@ -298,7 +297,7 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    -- 透視
+    -- 透視 (白色文字與方框)
     if not espEnabled then return end
     local active = {}
 
@@ -320,7 +319,7 @@ RunService.RenderStepped:Connect(function()
                         box.Name = "ESP_Box_" .. player.UserId
                         box.BackgroundTransparency = 1
                         box.BorderSizePixel = 1
-                        box.BorderColor3 = Color3.fromRGB(255, 0, 0)
+                        box.BorderColor3 = Color3.fromRGB(255, 255, 255) -- 白色方框
                         box.ZIndex = 9999
                         box.Parent = ScreenGui
                     end
@@ -333,7 +332,7 @@ RunService.RenderStepped:Connect(function()
                         text = Instance.new("TextLabel")
                         text.Name = "ESP_Text_" .. player.UserId
                         text.BackgroundTransparency = 1
-                        text.TextColor3 = Color3.fromRGB(0, 255, 0)
+                        text.TextColor3 = Color3.fromRGB(255, 255, 255) -- 純白文字
                         text.TextStrokeTransparency = 0
                         text.Font = Enum.Font.SourceSansBold
                         text.TextSize = 14
