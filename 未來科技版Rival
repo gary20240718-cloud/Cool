@@ -104,8 +104,13 @@ local function createToggle(posY, text)
             switchDot.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
         end
 
-        if text == "飛天 (穿牆)" then flyEnabled = not flyEnabled 
-        elseif text == "瞬移 (穿牆)" then tpEnabled = not tpEnabled end
+        if text == "飛天 (穿牆)" then 
+            flyEnabled = not flyEnabled 
+            if flyEnabled then startFly() else stopFly() end
+        elseif text == "瞬移 (穿牆)" then 
+            tpEnabled = not tpEnabled 
+            if tpEnabled then checkTeleportLimit() end
+        end
     end)
 end
 
@@ -170,6 +175,41 @@ local tpEnabled = false
 local tpMode = "Body"
 local isGoingUp = false
 local isGoingDown = false
+-- 飛天物理控制 (強制對抗大廳重力)
+local flyBV = nil
+local function startFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    -- 清理舊的
+    if hrp:FindFirstChild("HackFlyBV") then hrp.HackFlyBV:Destroy() end
+    
+    local bv = Instance.new("BodyVelocity")
+    bv.Name = "HackFlyBV"
+    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9) -- 極大推力
+    bv.Velocity = Vector3.new(0, 0, 0)
+    bv.Parent = hrp
+    flyBV = bv
+    
+    UpBtn.Visible = true
+    DownBtn.Visible = true
+end
+
+local function stopFly()
+    UpBtn.Visible = false
+    DownBtn.Visible = false
+    isGoingUp = false
+    isGoingDown = false
+    
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local hrp = char.HumanoidRootPart
+        if hrp:FindFirstChild("HackFlyBV") then hrp.HackFlyBV:Destroy() end
+    end
+end
+
 ESPBtn.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     ESPBtn.Text = "透視: " .. (espEnabled and "開啟" or "關閉")
@@ -206,61 +246,87 @@ UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.Touch then isGoingUp = false; isGoingDown = false end
 end)
 
+-- 🚨 瞬移人數限制提示
+local promptUI = Instance.new("TextLabel")
+promptUI.Size = UDim2.new(0, 300, 0, 50)
+promptUI.Position = UDim2.new(0.5, -150, 0.3, 0)
+promptUI.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+promptUI.TextColor3 = Color3.fromRGB(255, 255, 255)
+promptUI.TextSize = 18
+promptUI.Font = Enum.Font.SourceSansBold
+promptUI.Text = "❌ 活人超過 5 個，瞬移失效！"
+promptUI.Visible = false
+promptUI.Parent = ScreenGui
+
+local function checkTeleportLimit()
+    local count = 0
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character and not p:IsTeammate(LocalPlayer) then
+            if p.Character:FindFirstChildOfClass("Humanoid") and p.Character.Humanoid.Health > 0 then
+                count = count + 1
+            end
+        end
+    end
+    
+    if count > 5 then
+        promptUI.Visible = true
+        task.wait(3)
+        promptUI.Visible = false
+        tpEnabled = false
+    end
+end
+
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 🚨 絕對暴力飛天 (每幀強制修改座標，無視重力)
-    if flyEnabled and hrp and humanoid then
-        UpBtn.Visible = true
-        DownBtn.Visible = true
+    -- 🚨 飛天物理控制 (結合速度與強制座標)
+    if flyEnabled and hrp and humanoid and flyBV then
         humanoid.PlatformStand = true
         for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
         
-        -- 基礎垂直位置 (不做任何懸停，避免卡死)
-        local newPos = hrp.CFrame.Position
-        if isGoingUp then newPos = newPos + Vector3.new(0, 1, 0) end
-        if isGoingDown then newPos = newPos - Vector3.new(0, 1, 0) end
+        local moveDir = humanoid.MoveDirection * 60
+        if isGoingUp then moveDir = moveDir + Vector3.new(0, 50, 0) end
+        if isGoingDown then moveDir = moveDir - Vector3.new(0, 50, 0) end
         
-        -- 加入搖桿的水平移動
-        local moveDir = humanoid.MoveDirection
-        newPos = newPos + (moveDir * 1.5)
-        
-        hrp.CFrame = CFrame.new(newPos) -- 強制座標，不依賴物理引擎
-        hrp.Velocity = Vector3.new(0, 0, 0)
-    else
-        UpBtn.Visible = false
-        DownBtn.Visible = false
-        if humanoid then humanoid.PlatformStand = false end
+        if humanoid.MoveDirection.Magnitude == 0 and not isGoingUp and not isGoingDown then
+            flyBV.Velocity = Vector3.new(0, 2, 0) -- 微弱的懸停力
+        else
+            flyBV.Velocity = moveDir
+        end
     end
 
-    -- 瞬移 (移除人數限制，大廳絕對能用)
+    -- 瞬移 (超過 5 人自動失效)
     if tpEnabled and hrp then
-        for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
-        local closest = nil
-        local dist = math.huge
-        
+        local enemies = {}
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and not player:IsTeammate(LocalPlayer) then
                 local pRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 if pRoot and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-                    local d = (hrp.Position - pRoot.Position).Magnitude
-                    if d < dist then dist = d; closest = pRoot end
+                    table.insert(enemies, pRoot)
                 end
             end
         end
         
-        if closest then
-            local pos = closest.Position
-            if tpMode == "Head2" then pos = pos + Vector3.new(0, 2, 0) end
-            if tpMode == "Head5" then pos = pos + Vector3.new(0, 5, 0) end
-            if pos.Y > -20 then hrp.CFrame = CFrame.new(pos) end
+        if #enemies > 0 and #enemies <= 5 then
+            for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
+            local closest, dist = nil, math.huge
+            for _, root in pairs(enemies) do
+                local d = (hrp.Position - root.Position).Magnitude
+                if d < dist then dist = d; closest = root end
+            end
+            if closest then
+                local pos = closest.Position
+                if tpMode == "Head2" then pos = pos + Vector3.new(0, 2, 0) end
+                if tpMode == "Head5" then pos = pos + Vector3.new(0, 5, 0) end
+                if pos.Y > -20 then hrp.CFrame = CFrame.new(pos) end
+            end
         end
     end
 
-    -- 🚨 透視強制繪製 (文字絕對置中、無多餘長條)
+    -- 透視
     if not espEnabled then return end
     local active = {}
 
@@ -276,7 +342,6 @@ RunService.RenderStepped:Connect(function()
                 local dist = math.floor((Camera.CFrame.Position - pHead.Position).Magnitude)
                 
                 if onScreen then
-                    -- 方框
                     local box = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId)
                     if not box then
                         box = Instance.new("Frame")
@@ -291,7 +356,6 @@ RunService.RenderStepped:Connect(function()
                     box.Size = UDim2.new(0, 40, 0, 50)
                     box.Position = UDim2.new(0, headPos.X - 20, 0, headPos.Y - 10)
 
-                    -- 文字 (強制置中、精準對齊頭部中央)
                     local text = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId)
                     if not text then
                         text = Instance.new("TextLabel")
@@ -301,16 +365,14 @@ RunService.RenderStepped:Connect(function()
                         text.TextStrokeTransparency = 0
                         text.Font = Enum.Font.SourceSansBold
                         text.TextSize = 14
-                        text.TextXAlignment = Enum.TextXAlignment.Center -- 絕對置中
+                        text.TextXAlignment = Enum.TextXAlignment.Center
                         text.ZIndex = 100000
                         text.Parent = ScreenGui
                     end
                     text.Visible = true
-                    -- 將文字座標設為頭部正中央往上偏移 50 像素
                     text.Size = UDim2.new(0, 150, 0, 50)
                     text.Position = UDim2.new(0, headPos.X - 75, 0, headPos.Y - 60)
                     text.Text = player.Name .. "\n距離: " .. dist .. "m\n血量: " .. math.floor(pHum.Health) .. "/" .. math.floor(pHum.MaxHealth)
-                    
                 else
                     local b = ScreenGui:FindFirstChild("ESP_Box_" .. player.UserId); if b then b.Visible = false end
                     local t = ScreenGui:FindFirstChild("ESP_Text_" .. player.UserId); if t then t.Visible = false end
