@@ -106,7 +106,8 @@ local function createToggle(posY, text)
 
         if text == "飛天 (穿牆)" then 
             flyEnabled = not flyEnabled 
-            if flyEnabled then startFly() else stopFly() end
+            UpBtn.Visible = flyEnabled
+            DownBtn.Visible = flyEnabled
         elseif text == "瞬移 (穿牆)" then 
             tpEnabled = not tpEnabled 
             if tpEnabled then checkTeleportLimit() end
@@ -154,6 +155,7 @@ UpBtn.Text = "⬆️"
 UpBtn.TextColor3 = Color3.fromRGB(0, 255, 255)
 UpBtn.TextSize = 24
 UpBtn.Visible = false
+UpBtn.ZIndex = 100
 UpBtn.Parent = ScreenGui
 Instance.new("UICorner", UpBtn).CornerRadius = UDim.new(1, 0)
 
@@ -165,6 +167,7 @@ DownBtn.Text = "⬇️"
 DownBtn.TextColor3 = Color3.fromRGB(255, 50, 50)
 DownBtn.TextSize = 24
 DownBtn.Visible = false
+DownBtn.ZIndex = 100
 DownBtn.Parent = ScreenGui
 Instance.new("UICorner", DownBtn).CornerRadius = UDim.new(1, 0)
 
@@ -175,41 +178,6 @@ local tpEnabled = false
 local tpMode = "Body"
 local isGoingUp = false
 local isGoingDown = false
--- 飛天物理控制 (強制對抗大廳重力)
-local flyBV = nil
-local function startFly()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    
-    -- 清理舊的
-    if hrp:FindFirstChild("HackFlyBV") then hrp.HackFlyBV:Destroy() end
-    
-    local bv = Instance.new("BodyVelocity")
-    bv.Name = "HackFlyBV"
-    bv.MaxForce = Vector3.new(1e9, 1e9, 1e9) -- 極大推力
-    bv.Velocity = Vector3.new(0, 0, 0)
-    bv.Parent = hrp
-    flyBV = bv
-    
-    UpBtn.Visible = true
-    DownBtn.Visible = true
-end
-
-local function stopFly()
-    UpBtn.Visible = false
-    DownBtn.Visible = false
-    isGoingUp = false
-    isGoingDown = false
-    
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        local hrp = char.HumanoidRootPart
-        if hrp:FindFirstChild("HackFlyBV") then hrp.HackFlyBV:Destroy() end
-    end
-end
-
 ESPBtn.MouseButton1Click:Connect(function()
     espEnabled = not espEnabled
     ESPBtn.Text = "透視: " .. (espEnabled and "開啟" or "關閉")
@@ -256,6 +224,7 @@ promptUI.TextSize = 18
 promptUI.Font = Enum.Font.SourceSansBold
 promptUI.Text = "❌ 活人超過 5 個，瞬移失效！"
 promptUI.Visible = false
+promptUI.ZIndex = 10000
 promptUI.Parent = ScreenGui
 
 local function checkTeleportLimit()
@@ -282,23 +251,26 @@ RunService.RenderStepped:Connect(function()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChild("Humanoid")
 
-    -- 🚨 飛天物理控制 (結合速度與強制座標)
-    if flyEnabled and hrp and humanoid and flyBV then
+    -- 🚨 絕對暴力飛天 (強制覆寫座標)
+    if flyEnabled and hrp and humanoid then
         humanoid.PlatformStand = true
         for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end
         
-        local moveDir = humanoid.MoveDirection * 60
-        if isGoingUp then moveDir = moveDir + Vector3.new(0, 50, 0) end
-        if isGoingDown then moveDir = moveDir - Vector3.new(0, 50, 0) end
+        -- 直接修改座標，無視物理引擎
+        local newPos = hrp.Position
+        if isGoingUp then newPos = newPos + Vector3.new(0, 2, 0) end
+        if isGoingDown then newPos = newPos - Vector3.new(0, 2, 0) end
         
-        if humanoid.MoveDirection.Magnitude == 0 and not isGoingUp and not isGoingDown then
-            flyBV.Velocity = Vector3.new(0, 2, 0) -- 微弱的懸停力
-        else
-            flyBV.Velocity = moveDir
-        end
+        local moveDir = humanoid.MoveDirection
+        newPos = newPos + (moveDir * 2)
+        
+        hrp.CFrame = CFrame.new(newPos)
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    else
+        if humanoid then humanoid.PlatformStand = false end
     end
 
-    -- 瞬移 (超過 5 人自動失效)
+    -- 瞬移 (人數限制)
     if tpEnabled and hrp then
         local enemies = {}
         for _, player in pairs(Players:GetPlayers()) do
@@ -349,7 +321,7 @@ RunService.RenderStepped:Connect(function()
                         box.BackgroundTransparency = 1
                         box.BorderSizePixel = 1
                         box.BorderColor3 = Color3.fromRGB(255, 0, 0)
-                        box.ZIndex = 99999
+                        box.ZIndex = 9999
                         box.Parent = ScreenGui
                     end
                     box.Visible = true
@@ -366,7 +338,7 @@ RunService.RenderStepped:Connect(function()
                         text.Font = Enum.Font.SourceSansBold
                         text.TextSize = 14
                         text.TextXAlignment = Enum.TextXAlignment.Center
-                        text.ZIndex = 100000
+                        text.ZIndex = 10000
                         text.Parent = ScreenGui
                     end
                     text.Visible = true
